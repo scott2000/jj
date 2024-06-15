@@ -51,6 +51,7 @@ mod test_operations;
 mod test_parallelize_command;
 mod test_rebase_command;
 mod test_repo_change_report;
+mod test_reset_author_on_edit;
 mod test_resolve_command;
 mod test_restore_command;
 mod test_revset_output;

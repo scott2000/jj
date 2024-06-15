@@ -66,6 +66,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * `jj prev` and `jj next` have gained a `--conflict` flag which moves you
   to the next conflict in a child commit.
 
+* `revsets.reset-author-on-edit` can be used to automatically reset author
+  information/timestamp when rewriting commits. Default behavior is to reset
+  author timestamp when rewriting empty commits with no description if authored
+  by current user.
+
 ### Fixed bugs
 
 ## [0.18.0] - 2024-06-05

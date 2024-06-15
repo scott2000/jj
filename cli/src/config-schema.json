@@ -370,6 +370,11 @@
                     "type": "string",
                     "description": "Revisions to give shorter change and commit IDs to",
                     "default": "<revsets.log>"
+                },
+                "reset-author-on-edit": {
+                    "type": "string",
+                    "description": "Revisions which should have their author information and timestamp reset when they are edited",
+                    "default": "mine() & empty() & description(exact:\"\")"
                 }
             },
             "additionalProperties": {

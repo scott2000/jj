@@ -50,7 +50,7 @@ pub(crate) fn cmd_untrack(
 
     let mut tx = workspace_command.start_transaction().into_inner();
     let base_ignores = workspace_command.base_ignores()?;
-    let (mut locked_ws, wc_commit, _revset_helper) =
+    let (mut locked_ws, wc_commit, revset_helper) =
         workspace_command.start_working_copy_mutation()?;
     // Create a new tree without the unwanted files
     let mut tree_builder = MergedTreeBuilder::new(wc_commit.tree_id().clone());
@@ -59,11 +59,19 @@ pub(crate) fn cmd_untrack(
         tree_builder.set_or_remove(path, Merge::absent());
     }
     let new_tree_id = tree_builder.write_tree(&store)?;
-    let new_commit = tx
+    // Cannot use `rewrite_edited_commit` since workspace is locked, so we need
+    // to manually reset the author if necessary.
+    let reset_author =
+        revset_helper.check_reset_author_on_edit(tx.repo(), command.settings(), wc_commit.id())?;
+    let mut commit_builder = tx
         .mut_repo()
         .rewrite_commit(command.settings(), &wc_commit)
-        .set_tree_id(new_tree_id)
-        .write()?;
+        .set_tree_id(new_tree_id);
+    if reset_author {
+        let committer = commit_builder.committer().clone();
+        commit_builder = commit_builder.set_author(committer);
+    }
+    let new_commit = commit_builder.write()?;
     // Reset the working copy to the new commit
     locked_ws.locked_wc().reset(&new_commit)?;
     // Commit the working copy again so we can inform the user if paths couldn't be

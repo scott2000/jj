@@ -214,6 +214,31 @@ revset-aliases."immutable_heads()" = "main@origin | (main@origin.. & ~mine())"
 Ancestors of the configured set are also immutable. The root commit is always
 immutable even if the set is empty.
 
+### Author timestamp behavior
+
+Since `jj` often creates empty working-copy commits automatically, it can be
+undesirable to have the author timestamp be set at the time a commit is created,
+since you might not actually make any changes in that working-copy commit until
+later. To resolve this problem, if you make changes to an empty commit with no
+description that you authored, `jj` will automatically reset the author
+timestamp for that commit. This means that by default, the author timestamp
+represents the time that the first changes were made in a commit.
+
+This behavior can be configured using `revsets.reset-author-on-edit`, which has
+a default value of `mine() & empty() & description(exact:"")`. Any commits in
+this revset will have their author information and timestamp reset when they are
+rewritten, except for while rebasing. For example, to reset the author timestamp
+when making changes to any commit that you authored:
+
+```toml
+# Reset author when editing any commit authored by current user
+revsets.reset-author-on-edit = "mine()"
+```
+
+A more Git-like behavior might be to finalize a commit's author timestamp when a
+description is set (e.g. with `jj commit`), which could be achieved using
+`mine() & description(exact:"")`.
+
 ## Log
 
 ### Default revisions

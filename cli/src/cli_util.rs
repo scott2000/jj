@@ -494,6 +494,35 @@ impl WorkspaceCommandRevsetHelper {
             Some(workspace_context),
         )
     }
+
+    pub fn check_reset_author_on_edit(
+        &self,
+        repo: &dyn Repo,
+        settings: &UserSettings,
+        commit_id: &CommitId,
+    ) -> Result<bool, CommandError> {
+        let reset_author_on_edit = settings
+            .config()
+            .get_string("revsets.reset-author-on-edit")?;
+        let reset_author_revset =
+            revset::parse(&reset_author_on_edit, &self.revset_parse_context(settings)).map_err(
+                |e| config_error_with_message("Invalid `revsets.reset-author-on-edit`", e),
+            )?;
+        let id_prefix_context = IdPrefixContext::new(self.revset_extensions.clone());
+        let mut expression = RevsetExpressionEvaluator::new(
+            repo,
+            self.revset_extensions.clone(),
+            &id_prefix_context,
+            reset_author_revset,
+        );
+        expression.intersect_with(&RevsetExpression::commit(commit_id.clone()));
+        let reset_author = expression
+            .evaluate_to_commit_ids()
+            .map_err(|e| config_error_with_message("Invalid `revsets.reset-author-on-edit`", e))?
+            .next()
+            .is_some();
+        Ok(reset_author)
+    }
 }
 
 /// Provides utilities for writing a command that works on a [`Workspace`]
@@ -1247,14 +1276,23 @@ See https://github.com/martinvonz/jj/blob/main/docs/working-copy.md#stale-workin
         })?;
         drop(progress);
         if new_tree_id != *wc_commit.tree_id() {
+            let reset_author = self.revset_helper.check_reset_author_on_edit(
+                self.user_repo.repo.as_ref(),
+                &self.settings,
+                wc_commit.id(),
+            )?;
             let mut tx =
                 start_repo_transaction(&self.user_repo.repo, &self.settings, &self.string_args);
             tx.set_is_snapshot(true);
             let mut_repo = tx.mut_repo();
-            let commit = mut_repo
+            let mut commit_builder = mut_repo
                 .rewrite_commit(&self.settings, &wc_commit)
-                .set_tree_id(new_tree_id)
-                .write()?;
+                .set_tree_id(new_tree_id);
+            if reset_author {
+                let committer = commit_builder.committer().clone();
+                commit_builder = commit_builder.set_author(committer);
+            }
+            let commit = commit_builder.write()?;
             mut_repo.set_wc_commit(workspace_id, commit.id().clone())?;
 
             // Rebase descendants
@@ -1649,7 +1687,19 @@ impl WorkspaceCommandTransaction<'_> {
         commit: &Commit,
     ) -> Result<CommitBuilder, CommandError> {
         let settings = &self.helper.settings;
-        Ok(self.tx.mut_repo().rewrite_commit(settings, commit))
+        let reset_author = self.helper.revset_helper.check_reset_author_on_edit(
+            self.tx.repo(),
+            settings,
+            commit.id(),
+        )?;
+
+        let commit_builder = self.tx.mut_repo().rewrite_commit(settings, commit);
+        if reset_author {
+            let committer = commit_builder.committer().clone();
+            Ok(commit_builder.set_author(committer))
+        } else {
+            Ok(commit_builder)
+        }
     }
 
     pub fn format_commit_summary(&self, commit: &Commit) -> String {

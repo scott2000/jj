@@ -19,8 +19,6 @@ use crate::common::TestEnvironment;
 #[test]
 fn test_reset_author_default_config() {
     let test_env = TestEnvironment::default();
-    test_env
-        .add_config(r#"revsets.reset-author-on-edit = 'mine() & empty() & description(exact:"")'"#);
     test_env.jj_cmd_ok(test_env.env_root(), &["git", "init", "repo"]);
     let repo_path = test_env.env_root().join("repo");
 

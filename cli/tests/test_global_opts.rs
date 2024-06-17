@@ -109,8 +109,8 @@ fn test_no_subcommand() {
     let (stdout, stderr) = test_env.jj_cmd_ok(&repo_path, &[]);
     assert_eq!(stdout, "");
     insta::assert_snapshot!(stderr, @r###"
-    Working copy now at: kxryzmor 70ac3df3 (empty) (no description set)
-    Parent commit      : lylxulpl 9dbbb452 foo
+    Working copy now at: kxryzmor 89c70edf (empty) (no description set)
+    Parent commit      : lylxulpl 51bd3589 foo
     "###);
 }
 
@@ -124,7 +124,7 @@ fn test_ignore_working_copy() {
     std::fs::write(repo_path.join("file"), "initial").unwrap();
     let stdout = test_env.jj_cmd_success(&repo_path, &["log", "-T", "commit_id"]);
     insta::assert_snapshot!(stdout, @r###"
-    @  438471f3fbf1004298d8fb01eeb13663a051a643
+    @  b15ef4cdd277d2c63cce6d67c1916f53a36141f7
     ◉  0000000000000000000000000000000000000000
     "###);
 
@@ -140,7 +140,7 @@ fn test_ignore_working_copy() {
     // But without --ignore-working-copy, we get a new commit ID.
     let stdout = test_env.jj_cmd_success(&repo_path, &["log", "-T", "commit_id"]);
     insta::assert_snapshot!(stdout, @r###"
-    @  fab22d1acf5bb9c5aa48cb2c3dd2132072a359ca
+    @  4d2c49a8f8e2f1ba61f48ba79e5f4a5faa6512cf
     ◉  0000000000000000000000000000000000000000
     "###);
 }
@@ -558,7 +558,7 @@ fn test_no_user_configured() {
         .assert()
         .success();
     insta::assert_snapshot!(get_stderr_string(&assert), @r###"
-    Working copy now at: qpvuntsm 7a7d6016 (empty) without name
+    Working copy now at: qpvuntsm 5b69862b (empty) without name
     Parent commit      : zzzzzzzz 00000000 (empty) (no description set)
     Warning: Name and email not configured. Until configured, your commits will be created with the empty identity, and can't be pushed to remotes. To configure, run:
       jj config set --user user.name "Some One"
@@ -570,7 +570,7 @@ fn test_no_user_configured() {
         .assert()
         .success();
     insta::assert_snapshot!(get_stderr_string(&assert), @r###"
-    Working copy now at: qpvuntsm 906f8b89 (empty) without email
+    Working copy now at: qpvuntsm ef963b79 (empty) without email
     Parent commit      : zzzzzzzz 00000000 (empty) (no description set)
     Warning: Name and email not configured. Until configured, your commits will be created with the empty identity, and can't be pushed to remotes. To configure, run:
       jj config set --user user.name "Some One"

@@ -75,8 +75,8 @@ fn test_fix_leaf_commit() {
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r###"
     Fixed 1 commits of 1 checked.
-    Working copy now at: rlvkpnrz 8b02703b (no description set)
-    Parent commit      : qpvuntsm fda57e40 (no description set)
+    Working copy now at: rlvkpnrz 85ce8924 (no description set)
+    Parent commit      : qpvuntsm b2ca2bc5 (no description set)
     Added 0 files, modified 1 files, removed 0 files
     "###);
     let content = test_env.jj_cmd_success(&repo_path, &["file", "print", "file", "-r", "@-"]);
@@ -102,8 +102,8 @@ fn test_fix_parent_commit() {
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r###"
     Fixed 3 commits of 3 checked.
-    Working copy now at: mzvwutvl d6abb1f4 child2 | (no description set)
-    Parent commit      : qpvuntsm 4f4d2103 parent | (no description set)
+    Working copy now at: mzvwutvl d30c8ae2 child2 | (no description set)
+    Parent commit      : qpvuntsm 70a4dae2 parent | (no description set)
     Added 0 files, modified 1 files, removed 0 files
     "###);
     let content = test_env.jj_cmd_success(&repo_path, &["file", "print", "file", "-r", "parent"]);
@@ -169,8 +169,8 @@ fn test_default_revset() {
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r###"
     Fixed 3 commits of 3 checked.
-    Working copy now at: yostqsxw 0bd830d2 bar2 | (no description set)
-    Parent commit      : yqosqzyt 4747dd17 bar1 | (no description set)
+    Working copy now at: yostqsxw dabc47b2 bar2 | (no description set)
+    Parent commit      : yqosqzyt 984b5924 bar1 | (no description set)
     Added 0 files, modified 1 files, removed 0 files
     "###);
     let content = test_env.jj_cmd_success(&repo_path, &["file", "print", "file", "-r", "trunk1"]);
@@ -225,7 +225,7 @@ fn test_fix_immutable_commit() {
 
     let stderr = test_env.jj_cmd_failure(&repo_path, &["fix", "-s", "immutable"]);
     insta::assert_snapshot!(stderr, @r###"
-    Error: Commit 83eee3c8dce2 is immutable
+    Error: Commit e4b41a3ce243 is immutable
     Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     "###);
     let content =
@@ -260,7 +260,7 @@ fn test_fix_some_paths() {
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r###"
     Fixed 1 commits of 1 checked.
-    Working copy now at: qpvuntsm 3f72f723 (no description set)
+    Working copy now at: qpvuntsm 54a90d2b (no description set)
     Parent commit      : zzzzzzzz 00000000 (empty) (no description set)
     Added 0 files, modified 1 files, removed 0 files
     "###);
@@ -281,7 +281,7 @@ fn test_fix_cyclic() {
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r###"
     Fixed 1 commits of 1 checked.
-    Working copy now at: qpvuntsm affcf432 (no description set)
+    Working copy now at: qpvuntsm bf5e6a5a (no description set)
     Parent commit      : zzzzzzzz 00000000 (empty) (no description set)
     Added 0 files, modified 1 files, removed 0 files
     "###);
@@ -292,7 +292,7 @@ fn test_fix_cyclic() {
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r###"
     Fixed 1 commits of 1 checked.
-    Working copy now at: qpvuntsm 2de05835 (no description set)
+    Working copy now at: qpvuntsm 0e2d20d6 (no description set)
     Parent commit      : zzzzzzzz 00000000 (empty) (no description set)
     Added 0 files, modified 1 files, removed 0 files
     "###);
@@ -325,8 +325,8 @@ fn test_deduplication() {
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r###"
     Fixed 4 commits of 4 checked.
-    Working copy now at: yqosqzyt 5ac0edc4 d | (no description set)
-    Parent commit      : mzvwutvl 90d9a032 c | (empty) (no description set)
+    Working copy now at: yqosqzyt c5ace3dd d | (no description set)
+    Parent commit      : mzvwutvl 0a7b35b6 c | (empty) (no description set)
     Added 0 files, modified 1 files, removed 0 files
     "###);
     let content = test_env.jj_cmd_success(&repo_path, &["file", "print", "file", "-r", "a"]);
@@ -400,7 +400,7 @@ fn test_stderr_success() {
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r###"
     errorFixed 1 commits of 1 checked.
-    Working copy now at: qpvuntsm e8c5cda3 (no description set)
+    Working copy now at: qpvuntsm 487808ba (no description set)
     Parent commit      : zzzzzzzz 00000000 (empty) (no description set)
     Added 0 files, modified 1 files, removed 0 files
     "###);
@@ -452,7 +452,7 @@ fn test_fix_file_types() {
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r###"
     Fixed 1 commits of 1 checked.
-    Working copy now at: qpvuntsm 72bf7048 (no description set)
+    Working copy now at: qpvuntsm 6836a9e4 (no description set)
     Parent commit      : zzzzzzzz 00000000 (empty) (no description set)
     Added 0 files, modified 1 files, removed 0 files
     "###);
@@ -474,7 +474,7 @@ fn test_fix_executable() {
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r###"
     Fixed 1 commits of 1 checked.
-    Working copy now at: qpvuntsm eea49ac9 (no description set)
+    Working copy now at: qpvuntsm fee78e99 (no description set)
     Parent commit      : zzzzzzzz 00000000 (empty) (no description set)
     Added 0 files, modified 1 files, removed 0 files
     "###);
@@ -534,9 +534,9 @@ fn test_fix_adding_merge_commit() {
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r###"
     Fixed 1 commits of 1 checked.
-    Working copy now at: mzvwutvl 899a1398 (no description set)
-    Parent commit      : qpvuntsm 34782c48 a | (no description set)
-    Parent commit      : kkmpptxz 82e9bc6a b | (no description set)
+    Working copy now at: mzvwutvl f93eb5a9 (no description set)
+    Parent commit      : qpvuntsm 6e64e7a7 a | (no description set)
+    Parent commit      : kkmpptxz c536f264 b | (no description set)
     Added 0 files, modified 4 files, removed 0 files
     "###);
     let content = test_env.jj_cmd_success(&repo_path, &["file", "print", "file_a", "-r", "@"]);
@@ -565,9 +565,9 @@ fn test_fix_both_sides_of_conflict() {
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r###"
     Fixed 3 commits of 3 checked.
-    Working copy now at: mzvwutvl b7967885 (conflict) (empty) (no description set)
-    Parent commit      : qpvuntsm 06fe435a a | (no description set)
-    Parent commit      : kkmpptxz ce7ee79e b | (no description set)
+    Working copy now at: mzvwutvl b548185d (conflict) (empty) (no description set)
+    Parent commit      : qpvuntsm 8e8aad69 a | (no description set)
+    Parent commit      : kkmpptxz 91f9b284 b | (no description set)
     Added 0 files, modified 1 files, removed 0 files
     There are unresolved conflicts at these paths:
     file    2-sided conflict
@@ -609,9 +609,9 @@ fn test_fix_resolve_conflict() {
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r###"
     Fixed 3 commits of 3 checked.
-    Working copy now at: mzvwutvl 669396ce (empty) (no description set)
-    Parent commit      : qpvuntsm 3c63716f a | (no description set)
-    Parent commit      : kkmpptxz 82703f5e b | (no description set)
+    Working copy now at: mzvwutvl 6484a433 (empty) (no description set)
+    Parent commit      : qpvuntsm dd2721f1 a | (no description set)
+    Parent commit      : kkmpptxz 07c27a8e b | (no description set)
     Added 0 files, modified 1 files, removed 0 files
     "###);
     let content = test_env.jj_cmd_success(&repo_path, &["file", "print", "file", "-r", "@"]);

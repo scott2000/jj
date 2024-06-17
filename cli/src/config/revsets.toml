@@ -4,8 +4,7 @@
 [revsets]
 fix = "reachable(@, mutable())"
 log = "@ | ancestors(immutable_heads().., 2) | trunk()"
-reset-author-on-edit = "none()" # To make tests pass in this commit
-# reset-author-on-edit = 'mine() & empty() & description(exact:"")'
+reset-author-on-edit = 'mine() & empty() & description(exact:"")'
 
 [revset-aliases]
 'trunk()' = '''

@@ -36,6 +36,7 @@ use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use jj_lib::backend::{ChangeId, CommitId, MergedTreeId, TreeValue};
 use jj_lib::commit::Commit;
+use jj_lib::commit_builder::CommitBuilder;
 use jj_lib::fileset::FilesetExpression;
 use jj_lib::git_backend::GitBackend;
 use jj_lib::gitignore::{GitIgnoreError, GitIgnoreFile};
@@ -1623,6 +1624,14 @@ impl WorkspaceCommandTransaction<'_> {
     pub fn edit(&mut self, commit: &Commit) -> Result<(), EditCommitError> {
         let workspace_id = self.helper.workspace_id().to_owned();
         self.tx.mut_repo().edit(workspace_id, commit)
+    }
+
+    pub fn rewrite_edited_commit(
+        &mut self,
+        commit: &Commit,
+    ) -> Result<CommitBuilder, CommandError> {
+        let settings = &self.helper.settings;
+        Ok(self.tx.mut_repo().rewrite_commit(settings, commit))
     }
 
     pub fn format_commit_summary(&self, commit: &Commit) -> String {

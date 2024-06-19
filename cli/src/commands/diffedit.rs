@@ -105,9 +105,8 @@ don't make any changes, then the operation will be aborted.",
     if tree_id == *target_commit.tree_id() {
         writeln!(ui.status(), "Nothing changed.")?;
     } else {
-        let mut_repo = tx.mut_repo();
-        let new_commit = mut_repo
-            .rewrite_commit(command.settings(), &target_commit)
+        let new_commit = tx
+            .rewrite_edited_commit(&target_commit)?
             .set_tree_id(tree_id)
             .write()?;
         // rebase_descendants early; otherwise `new_commit` would always have

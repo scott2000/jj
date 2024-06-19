@@ -103,8 +103,7 @@ new working-copy commit.
     };
 
     let new_commit = tx
-        .mut_repo()
-        .rewrite_commit(command.settings(), &commit)
+        .rewrite_edited_commit(&commit)?
         .set_tree_id(tree_id)
         .set_description(description)
         .write()?;

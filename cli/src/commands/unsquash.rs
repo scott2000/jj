@@ -106,21 +106,18 @@ aborted.
         let description =
             combine_messages(tx.base_repo(), &[&parent], &commit, command.settings())?;
         // Commit the new child on top of the parent's parents.
-        tx.mut_repo()
-            .rewrite_commit(command.settings(), &commit)
+        tx.rewrite_edited_commit(&commit)?
             .set_parents(parent.parent_ids().to_vec())
             .set_description(description)
             .write()?;
     } else {
         let new_parent = tx
-            .mut_repo()
-            .rewrite_commit(command.settings(), &parent)
+            .rewrite_edited_commit(&parent)?
             .set_tree_id(new_parent_tree_id)
             .set_predecessors(vec![parent.id().clone(), commit.id().clone()])
             .write()?;
         // Commit the new child on top of the new parent.
-        tx.mut_repo()
-            .rewrite_commit(command.settings(), &commit)
+        tx.rewrite_edited_commit(&commit)?
             .set_parents(vec![new_parent.id().clone()])
             .write()?;
     }

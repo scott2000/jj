@@ -87,8 +87,7 @@ pub(crate) fn cmd_describe(
     } else {
         let mut tx = workspace_command.start_transaction();
         let mut commit_builder = tx
-            .mut_repo()
-            .rewrite_commit(command.settings(), &commit)
+            .rewrite_edited_commit(&commit)?
             .set_description(description);
         if args.reset_author {
             let new_author = commit_builder.committer().clone();

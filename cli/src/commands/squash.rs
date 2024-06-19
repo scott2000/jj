@@ -257,8 +257,7 @@ from the source will be moved into the destination.
             let source_tree = source.commit.tree()?;
             // Apply the reverse of the selected changes onto the source
             let new_source_tree = source_tree.merge(&source.selected_tree, &source.parent_tree)?;
-            tx.mut_repo()
-                .rewrite_commit(settings, source.commit)
+            tx.rewrite_edited_commit(source.commit)?
                 .set_tree_id(new_source_tree.id().clone())
                 .write()?;
         }
@@ -299,8 +298,7 @@ from the source will be moved into the destination.
             .iter()
             .map(|source| source.commit.id().clone()),
     );
-    tx.mut_repo()
-        .rewrite_commit(settings, &rewritten_destination)
+    tx.rewrite_edited_commit(&rewritten_destination)?
         .set_tree_id(destination_tree.id().clone())
         .set_predecessors(predecessors)
         .set_description(description)

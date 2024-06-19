@@ -131,8 +131,7 @@ the operation will be aborted.
     )?;
     let first_description = edit_description(tx.base_repo(), &first_template, command.settings())?;
     let first_commit = tx
-        .mut_repo()
-        .rewrite_commit(command.settings(), &commit)
+        .rewrite_edited_commit(&commit)?
         .set_tree_id(selected_tree_id)
         .set_description(first_description)
         .write()?;
@@ -168,8 +167,7 @@ the operation will be aborted.
         edit_description(tx.base_repo(), &second_template, command.settings())?
     };
     let second_commit = tx
-        .mut_repo()
-        .rewrite_commit(command.settings(), &commit)
+        .rewrite_edited_commit(&commit)?
         .set_parents(second_commit_parents)
         .set_tree_id(second_tree.id())
         // Generate a new change id so that the commit being split doesn't

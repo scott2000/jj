@@ -58,7 +58,6 @@ pub(crate) fn cmd_duplicate(
     let mut tx = workspace_command.start_transaction();
     let base_repo = tx.base_repo().clone();
     let store = base_repo.store();
-    let mut_repo = tx.mut_repo();
 
     for original_commit_id in to_duplicate.iter().rev() {
         // Topological order ensures that any parents of `original_commit` are
@@ -69,8 +68,8 @@ pub(crate) fn cmd_duplicate(
             .iter()
             .map(|id| duplicated_old_to_new.get(id).map_or(id, |c| c.id()).clone())
             .collect();
-        let new_commit = mut_repo
-            .rewrite_commit(command.settings(), &original_commit)
+        let new_commit = tx
+            .rewrite_edited_commit(&original_commit)?
             .generate_new_change_id()
             .set_parents(new_parents)
             .write()?;

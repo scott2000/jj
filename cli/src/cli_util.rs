@@ -473,6 +473,29 @@ impl AdvanceBranchesSettings {
     }
 }
 
+// State required for evaluating revsets while workspace is locked
+struct WorkspaceCommandRevsetHelper {
+    workspace_id: WorkspaceId,
+    revset_extensions: Arc<RevsetExtensions>,
+    revset_aliases_map: RevsetAliasesMap,
+    path_converter: RepoPathUiConverter,
+}
+
+impl WorkspaceCommandRevsetHelper {
+    fn revset_parse_context(&self, settings: &UserSettings) -> RevsetParseContext {
+        let workspace_context = RevsetWorkspaceContext {
+            path_converter: &self.path_converter,
+            workspace_id: &self.workspace_id,
+        };
+        RevsetParseContext::new(
+            &self.revset_aliases_map,
+            settings.user_email(),
+            &self.revset_extensions,
+            Some(workspace_context),
+        )
+    }
+}
+
 /// Provides utilities for writing a command that works on a [`Workspace`]
 /// (which most commands do).
 pub struct WorkspaceCommandHelper {
@@ -481,15 +504,13 @@ pub struct WorkspaceCommandHelper {
     settings: UserSettings,
     workspace: Workspace,
     user_repo: ReadonlyUserRepo,
-    revset_extensions: Arc<RevsetExtensions>,
     // TODO: Parsed template can be cached if it doesn't capture 'repo lifetime
     commit_summary_template_text: String,
     commit_template_extensions: Vec<Arc<dyn CommitTemplateLanguageExtension>>,
-    revset_aliases_map: RevsetAliasesMap,
     template_aliases_map: TemplateAliasesMap,
     may_update_working_copy: bool,
     working_copy_shared_with_git: bool,
-    path_converter: RepoPathUiConverter,
+    revset_helper: WorkspaceCommandRevsetHelper,
 }
 
 impl WorkspaceCommandHelper {
@@ -500,6 +521,7 @@ impl WorkspaceCommandHelper {
         workspace: Workspace,
         repo: Arc<ReadonlyRepo>,
     ) -> Result<Self, CommandError> {
+        let workspace_id = workspace.workspace_id().clone();
         let settings = command.settings.clone();
         let commit_summary_template_text =
             settings.config().get_string("templates.commit_summary")?;
@@ -518,14 +540,17 @@ impl WorkspaceCommandHelper {
             settings,
             workspace,
             user_repo: ReadonlyUserRepo::new(repo),
-            revset_extensions: command.revset_extensions.clone(),
             commit_summary_template_text,
             commit_template_extensions: command.commit_template_extensions.clone(),
-            revset_aliases_map,
             template_aliases_map,
             may_update_working_copy,
             working_copy_shared_with_git,
-            path_converter,
+            revset_helper: WorkspaceCommandRevsetHelper {
+                workspace_id,
+                revset_extensions: command.revset_extensions.clone(),
+                revset_aliases_map,
+                path_converter,
+            },
         };
         // Parse commit_summary template (and short-prefixes revset) early to
         // report error before starting mutable operation.
@@ -718,13 +743,13 @@ impl WorkspaceCommandHelper {
     }
 
     pub fn format_file_path(&self, file: &RepoPath) -> String {
-        self.path_converter.format_file_path(file)
+        self.path_converter().format_file_path(file)
     }
 
     /// Parses a path relative to cwd into a RepoPath, which is relative to the
     /// workspace root.
     pub fn parse_file_path(&self, input: &str) -> Result<RepoPathBuf, UiPathParseError> {
-        self.path_converter.parse_file_path(input)
+        self.path_converter().parse_file_path(input)
     }
 
     /// Parses the given strings as file patterns.
@@ -756,13 +781,13 @@ impl WorkspaceCommandHelper {
     ) -> Result<FilesetExpression, CommandError> {
         let expressions: Vec<_> = file_args
             .iter()
-            .map(|arg| fileset::parse_maybe_bare(arg, &self.path_converter))
+            .map(|arg| fileset::parse_maybe_bare(arg, self.path_converter()))
             .try_collect()?;
         Ok(FilesetExpression::union_all(expressions))
     }
 
     pub(crate) fn path_converter(&self) -> &RepoPathUiConverter {
-        &self.path_converter
+        &self.revset_helper.path_converter
     }
 
     #[instrument(skip_all)]
@@ -806,7 +831,7 @@ impl WorkspaceCommandHelper {
 
     /// Creates textual diff renderer of the specified `formats`.
     pub fn diff_renderer(&self, formats: Vec<DiffFormat>) -> DiffRenderer<'_> {
-        DiffRenderer::new(self.repo().as_ref(), &self.path_converter, formats)
+        DiffRenderer::new(self.repo().as_ref(), self.path_converter(), formats)
     }
 
     /// Loads textual diff renderer from the settings and command arguments.
@@ -981,28 +1006,20 @@ impl WorkspaceCommandHelper {
     ) -> Result<RevsetExpressionEvaluator<'_>, CommandError> {
         Ok(RevsetExpressionEvaluator::new(
             self.repo().as_ref(),
-            self.revset_extensions.clone(),
+            self.revset_helper.revset_extensions.clone(),
             self.id_prefix_context()?,
             expression,
         ))
     }
 
     pub(crate) fn revset_parse_context(&self) -> RevsetParseContext {
-        let workspace_context = RevsetWorkspaceContext {
-            path_converter: &self.path_converter,
-            workspace_id: self.workspace_id(),
-        };
-        RevsetParseContext::new(
-            &self.revset_aliases_map,
-            self.settings.user_email(),
-            &self.revset_extensions,
-            Some(workspace_context),
-        )
+        self.revset_helper.revset_parse_context(&self.settings)
     }
 
     pub fn id_prefix_context(&self) -> Result<&IdPrefixContext, CommandError> {
         self.user_repo.id_prefix_context.get_or_try_init(|| {
-            let mut context: IdPrefixContext = IdPrefixContext::new(self.revset_extensions.clone());
+            let mut context: IdPrefixContext =
+                IdPrefixContext::new(self.revset_helper.revset_extensions.clone());
             let revset_string: String = self
                 .settings
                 .config()
@@ -1121,7 +1138,7 @@ impl WorkspaceCommandHelper {
             })?;
         let mut expression = RevsetExpressionEvaluator::new(
             repo,
-            self.revset_extensions.clone(),
+            self.revset_helper.revset_extensions.clone(),
             self.id_prefix_context()?,
             immutable,
         );
@@ -1647,7 +1664,8 @@ impl WorkspaceCommandTransaction<'_> {
         commit: &Commit,
     ) -> std::io::Result<()> {
         // TODO: Use the disambiguation revset
-        let id_prefix_context = IdPrefixContext::new(self.helper.revset_extensions.clone());
+        let id_prefix_context =
+            IdPrefixContext::new(self.helper.revset_helper.revset_extensions.clone());
         let language = CommitTemplateLanguage::new(
             self.tx.repo(),
             self.helper.workspace_id(),

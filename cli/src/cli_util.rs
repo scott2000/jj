@@ -474,7 +474,7 @@ impl AdvanceBranchesSettings {
 }
 
 // State required for evaluating revsets while workspace is locked
-struct WorkspaceCommandRevsetHelper {
+pub struct WorkspaceCommandRevsetHelper {
     workspace_id: WorkspaceId,
     revset_extensions: Arc<RevsetExtensions>,
     revset_aliases_map: RevsetAliasesMap,
@@ -703,7 +703,7 @@ impl WorkspaceCommandHelper {
 
     pub fn unchecked_start_working_copy_mutation(
         &mut self,
-    ) -> Result<(LockedWorkspace, Commit), CommandError> {
+    ) -> Result<(LockedWorkspace, Commit, &WorkspaceCommandRevsetHelper), CommandError> {
         self.check_working_copy_writable()?;
         let wc_commit = if let Some(wc_commit_id) = self.get_wc_commit_id() {
             self.repo().store().get_commit(wc_commit_id)?
@@ -713,17 +713,18 @@ impl WorkspaceCommandHelper {
 
         let locked_ws = self.workspace.start_working_copy_mutation()?;
 
-        Ok((locked_ws, wc_commit))
+        Ok((locked_ws, wc_commit, &self.revset_helper))
     }
 
     pub fn start_working_copy_mutation(
         &mut self,
-    ) -> Result<(LockedWorkspace, Commit), CommandError> {
-        let (mut locked_ws, wc_commit) = self.unchecked_start_working_copy_mutation()?;
+    ) -> Result<(LockedWorkspace, Commit, &WorkspaceCommandRevsetHelper), CommandError> {
+        let (mut locked_ws, wc_commit, revset_helper) =
+            self.unchecked_start_working_copy_mutation()?;
         if wc_commit.tree_id() != locked_ws.locked_wc().old_tree_id() {
             return Err(user_error("Concurrent working copy operation. Try again."));
         }
-        Ok((locked_ws, wc_commit))
+        Ok((locked_ws, wc_commit, revset_helper))
     }
 
     pub fn workspace_root(&self) -> &PathBuf {

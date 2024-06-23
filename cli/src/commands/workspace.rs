@@ -174,7 +174,8 @@ fn cmd_workspace_add(
 
     // Copy sparse patterns from workspace where the command was run
     let mut new_workspace_command = WorkspaceCommandHelper::new(ui, command, new_workspace, repo)?;
-    let (mut locked_ws, _wc_commit) = new_workspace_command.start_working_copy_mutation()?;
+    let (mut locked_ws, _wc_commit, _revset_helper) =
+        new_workspace_command.start_working_copy_mutation()?;
     let sparse_patterns = old_workspace_command
         .working_copy()
         .sparse_patterns()?
@@ -315,7 +316,7 @@ fn create_and_check_out_recovery_commit(
     let workspace_id = workspace_command.workspace_id().clone();
     let mut tx = workspace_command.start_transaction().into_inner();
 
-    let (mut locked_workspace, commit) =
+    let (mut locked_workspace, commit, _revset_helper) =
         workspace_command.unchecked_start_working_copy_mutation()?;
     let commit_id = commit.id();
 
@@ -401,7 +402,7 @@ fn cmd_workspace_update_stale(
     let mut workspace_command = command.workspace_helper_no_snapshot(ui)?;
 
     let repo = workspace_command.repo().clone();
-    let (mut locked_ws, desired_wc_commit) =
+    let (mut locked_ws, desired_wc_commit, _revset_helper) =
         workspace_command.unchecked_start_working_copy_mutation()?;
     match check_stale_working_copy(locked_ws.locked_wc(), &desired_wc_commit, &repo)? {
         WorkingCopyFreshness::Fresh | WorkingCopyFreshness::Updated(_) => {

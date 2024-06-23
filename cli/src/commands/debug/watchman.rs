@@ -104,7 +104,8 @@ pub fn cmd_debug_watchman(
             writeln!(ui.stdout(), "Changed files: {changed_files:?}")?;
         }
         WatchmanCommand::ResetClock => {
-            let (mut locked_ws, _commit) = workspace_command.start_working_copy_mutation()?;
+            let (mut locked_ws, _commit, _revset_helper) =
+                workspace_command.start_working_copy_mutation()?;
             let Some(locked_local_wc): Option<&mut LockedLocalWorkingCopy> =
                 locked_ws.locked_wc().as_any_mut().downcast_mut()
             else {

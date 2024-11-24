@@ -63,6 +63,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - `op diff`
   - `restore`
 
+* Conflict markers are now allowed to be longer than 7 characters, allowing
+  conflicts to be materialized and parsed correctly in files which already
+  contain lines which look like conflict markers.
+
 * New `ui.conflict-marker-style` config option to change how conflicts are
   materialized in the working copy. The default option ("diff") renders
   conflicts as a snapshot with a list of diffs to apply to the snapshot.

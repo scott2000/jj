@@ -19,6 +19,7 @@ use jj_lib::conflicts::materialize_merge_result_to_bytes;
 use jj_lib::conflicts::parse_conflict;
 use jj_lib::conflicts::update_from_content;
 use jj_lib::conflicts::ConflictMarkerStyle;
+use jj_lib::conflicts::MIN_CONFLICT_MARKER_LEN;
 use jj_lib::merge::Merge;
 use jj_lib::repo::Repo;
 use jj_lib::repo_path::RepoPath;
@@ -505,7 +506,7 @@ fn test_materialize_parse_roundtrip() {
 
     // The first add should always be from the left side
     insta::assert_debug_snapshot!(
-        parse_conflict(materialized.as_bytes(), conflict.num_sides()),
+        parse_conflict(materialized.as_bytes(), conflict.num_sides(), MIN_CONFLICT_MARKER_LEN),
         @r###"
     Some(
         [
@@ -628,7 +629,8 @@ fn test_materialize_conflict_no_newlines_at_eof() {
     // BUG(#3968): These conflict markers cannot be parsed
     insta::assert_debug_snapshot!(parse_conflict(
         materialized.as_bytes(),
-        conflict.num_sides()
+        conflict.num_sides(),
+        MIN_CONFLICT_MARKER_LEN
     ),@"None");
 }
 
@@ -795,7 +797,8 @@ line 3
 line 4
 line 5
 "},
-            2
+            2,
+            7
         ),
         None
     );
@@ -817,7 +820,8 @@ fn test_parse_conflict_simple() {
             >>>>>>>
             line 5
             "},
-            2
+            2,
+            7
         ),
         @r###"
     Some(
@@ -853,7 +857,8 @@ fn test_parse_conflict_simple() {
             >>>>>>> More and more text
             line 5
             "},
-            2
+            2,
+            7
         ),
         @r###"
     Some(
@@ -892,7 +897,8 @@ fn test_parse_conflict_simple() {
             >>>>>>> Random text
             line 5
             "},
-            2
+            2,
+            7
         ),
         @r#"
     Some(
@@ -931,7 +937,8 @@ fn test_parse_conflict_simple() {
             >>>>>>> Random text
             line 5
             "},
-            2
+            2,
+            7
         ),
         @r#"
     Some(
@@ -969,7 +976,8 @@ fn test_parse_conflict_simple() {
             >>>>>>> End
             line 5
             "},
-            2
+            2,
+            7
         ),
         @r#"
     Some(
@@ -1005,7 +1013,8 @@ fn test_parse_conflict_simple() {
             >>>>>>> End
             line 5
             "},
-            2
+            2,
+            7
         ),
         @r#"
     Some(
@@ -1027,8 +1036,7 @@ fn test_parse_conflict_simple() {
     )
     "#
     );
-    // The conflict markers are too long and shouldn't parse (though we may
-    // decide to change this in the future)
+    // Conflict markers are allowed to be longer than necessary
     insta::assert_debug_snapshot!(
         parse_conflict(indoc! {b"
             line 1
@@ -1043,9 +1051,28 @@ fn test_parse_conflict_simple() {
             >>>>>>>>>>>
             line 5
             "},
-            2
+            2,
+            7
         ),
-        @"None"
+        @r#"
+    Some(
+        [
+            Resolved(
+                "line 1\n",
+            ),
+            Conflicted(
+                [
+                    "line 2\nleft\nline 4\n",
+                    "line 2\nline 3\nline 4\n",
+                    "right\n",
+                ],
+            ),
+            Resolved(
+                "line 5\n",
+            ),
+        ],
+    )
+    "#
     );
 }
 
@@ -1071,7 +1098,8 @@ fn test_parse_conflict_multi_way() {
                 >>>>>>>
                 line 5
                 "},
-            3
+            3,
+            7
         ),
         @r###"
     Some(
@@ -1114,7 +1142,8 @@ fn test_parse_conflict_multi_way() {
             >>>>>>> Random text
             line 5
             "},
-            3
+            3,
+            7
         ),
         @r###"
     Some(
@@ -1160,7 +1189,8 @@ fn test_parse_conflict_multi_way() {
             >>>>>>> Random text
             line 5
             "},
-            3
+            3,
+            7
         ),
         @r#"
     Some(
@@ -1203,7 +1233,8 @@ fn test_parse_conflict_crlf_markers() {
             >>>>>>>\r
             line 5\r
             "},
-            2
+            2,
+            7
         ),
         @r#"
     Some(
@@ -1248,7 +1279,8 @@ fn test_parse_conflict_diff_stripped_whitespace() {
             >>>>>>>
             line 5
             "},
-            2
+            2,
+            7
         ),
         @r#"
     Some(
@@ -1290,7 +1322,8 @@ fn test_parse_conflict_wrong_arity() {
             >>>>>>>
             line 5
             "},
-            3
+            3,
+            7
         ),
         None
     );
@@ -1311,7 +1344,8 @@ fn test_parse_conflict_malformed_missing_removes() {
             >>>>>>>
             line 5
             "},
-            2
+            2,
+            7
         ),
         None
     );
@@ -1334,7 +1368,8 @@ fn test_parse_conflict_malformed_marker() {
             >>>>>>>
             line 5
             "},
-            2
+            2,
+            7
         ),
         None
     );
@@ -1358,7 +1393,8 @@ fn test_parse_conflict_malformed_diff() {
             >>>>>>>
             line 5
             "},
-            2
+            2,
+            7
         ),
         None
     );
@@ -1380,7 +1416,8 @@ fn test_parse_conflict_snapshot_missing_header() {
             >>>>>>>
             line 5
             "},
-            2
+            2,
+            7
         ),
         None
     );
@@ -1400,7 +1437,8 @@ fn test_parse_conflict_wrong_git_style() {
             >>>>>>>
             line 5
             "},
-            2
+            2,
+            7
         ),
         None
     );
@@ -1422,7 +1460,8 @@ fn test_parse_conflict_git_reordered_headers() {
             >>>>>>>
             line 5
             "},
-            2
+            2,
+            7
         ),
         None
     );
@@ -1448,7 +1487,8 @@ fn test_parse_conflict_git_too_many_sides() {
             >>>>>>>
             line 5
             "},
-            3
+            3,
+            7
         ),
         None
     );
@@ -1471,7 +1511,8 @@ fn test_parse_conflict_mixed_header_styles() {
             >>>>>>>
             line 5
             "},
-            2
+            2,
+            7
         ),
         None
     );
@@ -1489,7 +1530,8 @@ fn test_parse_conflict_mixed_header_styles() {
             >>>>>>>
             line 5
             "},
-            2
+            2,
+            7
         ),
         None
     );
@@ -1506,7 +1548,8 @@ fn test_parse_conflict_mixed_header_styles() {
             >>>>>>> Conflict 1 of 1 ends
             line 5
             "},
-            2
+            2,
+            7
         ),
         @r#"
     Some(
@@ -1541,7 +1584,8 @@ fn test_parse_conflict_mixed_header_styles() {
             >>>>>>> Side #2 (Conflict 1 of 1 ends)
             line 5
             "},
-            2
+            2,
+            7
         ),
         @r#"
     Some(

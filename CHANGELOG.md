@@ -71,6 +71,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   "diff3" conflict style, meaning it is more likely to work with external tools,
   but it doesn't support conflicts with more than 2 sides.
 
+* Conflict markers are now allowed to be longer than 7 characters, allowing
+  conflicts to be materialized and parsed correctly in files which already
+  contain lines which look like conflict markers.
+
 ### Fixed bugs
 
 * `jj config unset <TABLE-NAME>` no longer removes a table (such as `[ui]`.)

@@ -1839,15 +1839,17 @@ fn test_update_conflict_from_content_with_long_markers() {
             <<<< left 1
             line 2
             <<<<<<<<<<<< left 3
+            ======================== git conflict markers can't be long
         "},
     );
     let right_file_id = testutils::write_file(
         store,
         path,
         indoc! {"
-            >>>>>>> right 1
+            ======= right 1
             line 2
             >>>>>>>>>>>> right 3
+            |||||||||||||||||||||||| git conflict markers can't be long
         "},
     );
     let conflict = Merge::from_removes_adds(
@@ -1855,9 +1857,11 @@ fn test_update_conflict_from_content_with_long_markers() {
         vec![Some(left_file_id.clone()), Some(right_file_id.clone())],
     );
 
-    // The conflict should be materialized using long conflict markers
+    // The conflict should be materialized using long conflict markers ("git"
+    // conflict markers should fall back to "snapshot", since "git" doesn't support
+    // long conflict markers)
     let materialized =
-        materialize_conflict_string(store, path, &conflict, ConflictMarkerStyle::Snapshot);
+        materialize_conflict_string(store, path, &conflict, ConflictMarkerStyle::Git);
     insta::assert_snapshot!(materialized, @r##"
     <<<<<<<<<<<<<<<< Conflict 1 of 2
     ++++++++++++++++ Contents of side #1
@@ -1865,16 +1869,18 @@ fn test_update_conflict_from_content_with_long_markers() {
     ---------------- Contents of base
     line 1
     ++++++++++++++++ Contents of side #2
-    >>>>>>> right 1
+    ======= right 1
     >>>>>>>>>>>>>>>> Conflict 1 of 2 ends
     line 2
     <<<<<<<<<<<<<<<< Conflict 2 of 2
     ++++++++++++++++ Contents of side #1
     <<<<<<<<<<<< left 3
+    ======================== git conflict markers can't be long
     ---------------- Contents of base
     line 3
     ++++++++++++++++ Contents of side #2
     >>>>>>>>>>>> right 3
+    |||||||||||||||||||||||| git conflict markers can't be long
     >>>>>>>>>>>>>>>> Conflict 2 of 2 ends
     "## );
 
@@ -1914,7 +1920,7 @@ fn test_update_conflict_from_content_with_long_markers() {
         ---------------- Contents of base
         line 1
         ++++++++++++++++ Contents of side #2
-        >>>>>>> right 1
+        ======= right 1
         >>>>>>>>>>>>>>>> Conflict 1 of 2 ends
         line 2
         line 3
@@ -1933,7 +1939,7 @@ fn test_update_conflict_from_content_with_long_markers() {
         store,
         path,
         indoc! {"
-            >>>>>>> right 1
+            ======= right 1
             line 2
             line 3
         "},
@@ -1961,8 +1967,9 @@ fn test_update_conflict_from_content_with_long_markers() {
     // still, since they aren't the longest ones in the file).
     assert_eq!(parse(&new_conflict, materialized.as_bytes()), conflict);
 
-    // If the new conflict is materialized again, it should have shorter
-    // conflict markers now
+    // If the new conflict is materialized again, it should have shorter conflict
+    // markers. The conflict markers still need to be longer than normal though,
+    // since "=======" is a valid Git-style conflict marker of length 7.
     insta::assert_snapshot!(
         materialize_conflict_string(store, path, &new_conflict, ConflictMarkerStyle::Snapshot),
         @r##"
@@ -1972,7 +1979,7 @@ fn test_update_conflict_from_content_with_long_markers() {
     ----------- Contents of base
     line 1
     +++++++++++ Contents of side #2
-    >>>>>>> right 1
+    ======= right 1
     >>>>>>>>>>> Conflict 1 of 1 ends
     line 2
     line 3

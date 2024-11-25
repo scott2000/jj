@@ -263,6 +263,14 @@ impl ConflictMarkerKind {
             _ => None,
         }
     }
+
+    /// Returns true if the conflict marker is allowed to be longer than
+    /// MIN_CONFLICT_MARKER_LEN. We don't allow Git-style conflict markers to be
+    /// long, which reduces the number of situations where long conflict markers
+    /// need to be used (since "=======" is a common separator line in files).
+    fn allows_long_markers(&self) -> bool {
+        !matches!(self, Self::GitAncestor | Self::GitSeparator)
+    }
 }
 
 /// Represents a conflict marker parsed from the file. Conflict markers consist
@@ -280,6 +288,7 @@ fn write_conflict_marker(
     suffix_text: &str,
 ) -> io::Result<()> {
     debug_assert!(len >= MIN_CONFLICT_MARKER_LEN);
+    debug_assert!(kind.allows_long_markers() || len == MIN_CONFLICT_MARKER_LEN);
 
     let conflict_marker: BString = iter::repeat(kind.to_byte()).take(len).collect();
 
@@ -296,6 +305,11 @@ fn parse_conflict_marker_any_len(line: &[u8]) -> Option<ConflictMarker> {
     let first_byte = *line.first()?;
     let kind = ConflictMarkerKind::parse_byte(first_byte)?;
     let len = line.iter().take_while(|&&b| b == first_byte).count();
+
+    // Some conflict markers must be not be longer than MIN_CONFLICT_MARKER_LEN
+    if len > MIN_CONFLICT_MARKER_LEN && !kind.allows_long_markers() {
+        return None;
+    }
 
     if let Some(next_byte) = line.get(len) {
         // If there is a character after the marker, it must be ASCII whitespace
@@ -409,16 +423,12 @@ fn materialize_conflict_hunks(
             let conflict_info = format!("Conflict {conflict_index} of {num_conflicts}");
 
             match (conflict_marker_style, hunk.as_slice()) {
-                // 2-sided conflicts can use Git-style conflict markers
-                (ConflictMarkerStyle::Git, [left, base, right]) => {
-                    materialize_git_style_conflict(
-                        left,
-                        base,
-                        right,
-                        &conflict_info,
-                        conflict_marker_len,
-                        output,
-                    )?;
+                // 2-sided conflicts can use Git-style conflict markers, but the markers cannot be
+                // longer than MIN_CONFLICT_MARKER_LEN
+                (ConflictMarkerStyle::Git, [left, base, right])
+                    if conflict_marker_len == MIN_CONFLICT_MARKER_LEN =>
+                {
+                    materialize_git_style_conflict(left, base, right, &conflict_info, output)?;
                 }
                 _ => {
                     materialize_jj_style_conflict(
@@ -440,20 +450,19 @@ fn materialize_git_style_conflict(
     base: &[u8],
     right: &[u8],
     conflict_info: &str,
-    conflict_marker_len: usize,
     output: &mut dyn Write,
 ) -> io::Result<()> {
     write_conflict_marker(
         output,
         ConflictMarkerKind::ConflictStart,
-        conflict_marker_len,
+        MIN_CONFLICT_MARKER_LEN,
         &format!("Side #1 ({conflict_info})"),
     )?;
     output.write_all(left)?;
     write_conflict_marker(
         output,
         ConflictMarkerKind::GitAncestor,
-        conflict_marker_len,
+        MIN_CONFLICT_MARKER_LEN,
         "Base",
     )?;
     output.write_all(base)?;
@@ -461,14 +470,14 @@ fn materialize_git_style_conflict(
     write_conflict_marker(
         output,
         ConflictMarkerKind::GitSeparator,
-        conflict_marker_len,
+        MIN_CONFLICT_MARKER_LEN,
         "",
     )?;
     output.write_all(right)?;
     write_conflict_marker(
         output,
         ConflictMarkerKind::ConflictEnd,
-        conflict_marker_len,
+        MIN_CONFLICT_MARKER_LEN,
         &format!("Side #2 ({conflict_info} ends)"),
     )?;
 

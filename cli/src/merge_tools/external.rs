@@ -58,6 +58,11 @@ pub struct ExternalMergeTool {
     /// `$left`, `$right`, `$base`, and `$output` are replaced with
     /// paths to the corresponding files.
     pub merge_args: Vec<String>,
+    /// If false (default), any exit status from the merge tool other than 0
+    /// will cause `jj resolve` to fail. If true, then any status between 1 and
+    /// 127 can be used to indicate that the conflict was not fully resolved,
+    /// and the output file may contain conflict markers.
+    pub merge_tool_error_status_on_conflict: bool,
     /// If false (default), the `$output` file starts out empty and is accepted
     /// as a full conflict resolution as-is by `jj` after the merge tool is
     /// done with it. If true, the `$output` file starts out with the
@@ -91,6 +96,7 @@ impl Default for ExternalMergeTool {
             diff_args: ["$left", "$right"].map(ToOwned::to_owned).to_vec(),
             edit_args: ["$left", "$right"].map(ToOwned::to_owned).to_vec(),
             merge_args: vec![],
+            merge_tool_error_status_on_conflict: false,
             merge_tool_edits_conflict_markers: false,
             diff_invocation_mode: DiffToolMode::Dir,
         }
@@ -211,7 +217,12 @@ pub fn run_mergetool_external(
             tool_binary: editor.program.clone(),
             source: e,
         })?;
-    if !exit_status.success() {
+
+    let exit_status_implies_conflict = editor.merge_tool_error_status_on_conflict
+        && !exit_status.success()
+        && exit_status.code().is_some_and(|code| code <= 127);
+
+    if !exit_status.success() && !exit_status_implies_conflict {
         return Err(ConflictResolveError::from(ExternalToolError::ToolAborted {
             exit_status,
         }));
@@ -223,7 +234,7 @@ pub fn run_mergetool_external(
         return Err(ConflictResolveError::EmptyOrUnchanged);
     }
 
-    let new_file_ids = if editor.merge_tool_edits_conflict_markers {
+    let new_file_ids = if editor.merge_tool_edits_conflict_markers || exit_status_implies_conflict {
         conflicts::update_from_content(
             &file_merge,
             tree.store(),

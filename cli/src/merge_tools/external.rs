@@ -58,6 +58,11 @@ pub struct ExternalMergeTool {
     /// `$left`, `$right`, `$base`, and `$output` are replaced with
     /// paths to the corresponding files.
     pub merge_args: Vec<String>,
+    /// If false (default), any exit status from the merge tool other than 0
+    /// will cause `jj resolve` to fail. If true, then any status between 1 and
+    /// 127 can be used to indicate that the conflict was not fully resolved,
+    /// and the output file should contain conflict markers.
+    pub merge_tool_error_status_on_conflict: bool,
     /// If false (default), the `$output` file starts out empty and is accepted
     /// as a full conflict resolution as-is by `jj` after the merge tool is
     /// done with it. If true, the `$output` file starts out with the
@@ -93,6 +98,7 @@ impl Default for ExternalMergeTool {
             diff_args: ["$left", "$right"].map(ToOwned::to_owned).to_vec(),
             edit_args: ["$left", "$right"].map(ToOwned::to_owned).to_vec(),
             merge_args: vec![],
+            merge_tool_error_status_on_conflict: false,
             merge_tool_edits_conflict_markers: false,
             conflict_marker_style: None,
             diff_invocation_mode: DiffToolMode::Dir,
@@ -150,6 +156,11 @@ pub enum ExternalToolError {
     },
     #[error("Tool exited with {exit_status} (run with --debug to see the exact invocation)")]
     ToolAborted { exit_status: ExitStatus },
+    #[error(
+        "Tool exited with {exit_status}, but did not produce valid conflict markers (run with \
+         --debug to see the exact invocation)"
+    )]
+    InvalidConflictMarkers { exit_status: ExitStatus },
     #[error("I/O error")]
     Io(#[source] std::io::Error),
 }
@@ -218,7 +229,13 @@ pub fn run_mergetool_external(
             tool_binary: editor.program.clone(),
             source: e,
         })?;
-    if !exit_status.success() {
+
+    // Check whether the exit status implies that there should be conflict markers
+    let exit_status_implies_conflict = editor.merge_tool_error_status_on_conflict
+        && !exit_status.success()
+        && exit_status.code().is_some_and(|code| code <= 127);
+
+    if !exit_status.success() && !exit_status_implies_conflict {
         return Err(ConflictResolveError::from(ExternalToolError::ToolAborted {
             exit_status,
         }));
@@ -230,7 +247,7 @@ pub fn run_mergetool_external(
         return Err(ConflictResolveError::EmptyOrUnchanged);
     }
 
-    let new_file_ids = if editor.merge_tool_edits_conflict_markers {
+    let new_file_ids = if editor.merge_tool_edits_conflict_markers || exit_status_implies_conflict {
         conflicts::update_from_content(
             &file_merge,
             tree.store(),
@@ -246,6 +263,17 @@ pub fn run_mergetool_external(
             .block_on()?;
         Merge::normal(new_file_id)
     };
+
+    // If the exit status indicated there should be conflict markers but there
+    // weren't any, it's likely that the tool generated invalid conflict markers, so
+    // we need to inform the user. If we didn't treat this as an error, the user
+    // might think the conflict was resolved successfully.
+    if exit_status_implies_conflict && new_file_ids.is_resolved() {
+        return Err(ConflictResolveError::ExternalTool(
+            ExternalToolError::InvalidConflictMarkers { exit_status },
+        ));
+    }
+
     let new_tree_value = match new_file_ids.into_resolved() {
         Ok(new_file_id) => Merge::normal(TreeValue::File {
             id: new_file_id.unwrap(),

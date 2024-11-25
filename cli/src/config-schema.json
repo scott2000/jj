@@ -400,6 +400,11 @@
                             "type": "string"
                         }
                     },
+                    "merge-tool-error-status-on-conflict": {
+                      "type": "boolean",
+                      "description": "If true, an exit status between 1 and 127 indicates that the conflict was only partially resolved. See https://martinvonz.github.io/jj/latest/config/#editing-conflict-markers-with-a-tool-or-a-text-editor",
+                      "default": false
+                    },
                     "merge-tool-edits-conflict-markers": {
                         "type": "boolean",
                         "description": "Whether to populate the output file with conflict markers before starting the merge tool. See https://martinvonz.github.io/jj/latest/config/#editing-conflict-markers-with-a-tool-or-a-text-editor",

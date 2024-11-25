@@ -841,9 +841,19 @@ merge-tool-edits-conflict-markers = true    # See below for an explanation
 ### Editing conflict markers with a tool or a text editor
 
 By default, the merge tool starts with an empty output file. If the tool puts
-anything into the output file, and exits with the 0 exit code,
-`jj` assumes that the conflict is fully resolved. This is appropriate for most
-graphical merge tools.
+anything into the output file and exits with the 0 exit code,
+`jj` assumes that the conflict is fully resolved, while if the tool exits with
+a non-zero exit code, `jj` assumes that the merge should be cancelled.
+This is appropriate for most graphical merge tools.
+
+For merge tools which try to automatically resolve conflicts without user
+input, this behavior may not be desired. These tools may require setting
+the `merge-tools.TOOL.merge-tool-error-status-on-conflict = true` option.
+With this option set, an exit code between 1 and 127 indicates that only some
+of the conflicts were resolved, and the output file should contain conflict
+markers. If a merge tool produces output using Git's "diff3" conflict style,
+`jj` should be able to parse it correctly, so many Git merge drivers should be
+usable with `jj` as well.
 
 Some tools (e.g. `vimdiff`) can present a multi-way diff but don't resolve
 conflict themselves. When using such tools, `jj`

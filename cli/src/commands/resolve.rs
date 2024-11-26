@@ -18,6 +18,7 @@ use clap_complete::ArgValueCandidates;
 use clap_complete::ArgValueCompleter;
 use itertools::Itertools;
 use jj_lib::object_id::ObjectId;
+use jj_lib::repo::Repo;
 use tracing::instrument;
 
 use crate::cli_util::print_conflicted_paths;
@@ -28,10 +29,12 @@ use crate::command_error::CommandError;
 use crate::complete;
 use crate::ui::Ui;
 
-/// Resolve a conflicted file with an external merge tool
+/// Resolve conflicted files with an external merge tool
 ///
 /// Only conflicts that can be resolved with a 3-way merge are supported. See
-/// docs for merge tool configuration instructions.
+/// docs for merge tool configuration instructions. By default, a single
+/// conflicted file will be resolved at a time. Use `--all` to run the merge
+/// tool on each conflicted file.
 ///
 /// Note that conflicts can also be resolved without using this command. You may
 /// edit the conflict markers in the conflicted file directly with a text
@@ -59,6 +62,11 @@ pub(crate) struct ResolveArgs {
     /// Specify 3-way merge tool to be used
     #[arg(long, conflicts_with = "list", value_name = "NAME")]
     tool: Option<String>,
+    /// Instead of resolving one conflict, resolve all conflicts one at a time.
+    /// If any conflict resolution fails, any already-resolved files will be
+    /// committed.
+    #[arg(long, short, conflicts_with = "list")]
+    all: bool,
     /// Restrict to these paths when searching for a conflict to resolve. We
     /// will attempt to resolve the first conflict we can find. You can use
     /// the `--list` argument to find paths to use here.
@@ -101,20 +109,46 @@ pub(crate) fn cmd_resolve(
         );
     };
 
-    let (repo_path, _) = conflicts.first().unwrap();
     workspace_command.check_rewritable([commit.id()])?;
     let merge_editor = workspace_command.merge_editor(ui, args.tool.as_deref())?;
-    writeln!(
-        ui.status(),
-        "Resolving conflicts in: {}",
-        workspace_command.format_file_path(repo_path)
-    )?;
     let mut tx = workspace_command.start_transaction();
-    let new_tree_id = merge_editor.edit_file(&tree, repo_path)?;
+
+    let conflicts_to_resolve = if args.all {
+        &conflicts
+    } else {
+        &conflicts[..1]
+    };
+
+    let tree_id = tree.id();
+    let mut new_tree = tree;
+    let mut suppressed_err = None;
+    for (repo_path, _) in conflicts_to_resolve {
+        writeln!(
+            ui.status(),
+            "Resolving conflicts in: {}",
+            tx.base_workspace_helper().format_file_path(repo_path)
+        )?;
+        match merge_editor.edit_file(&new_tree, repo_path) {
+            Ok(tree_id) => new_tree = tx.repo().store().get_root_tree(&tree_id)?,
+            Err(err) => {
+                if new_tree.id() == tree_id {
+                    // Since no conflicts were successfully resolved, we can return the error
+                    // immediately
+                    return Err(err.into());
+                } else {
+                    // We want to only return the error at the end of the function, since some
+                    // conflicts were resolved successfully
+                    suppressed_err = Some(err.into());
+                    break;
+                }
+            }
+        }
+    }
+
     let new_commit = tx
         .repo_mut()
         .rewrite_commit(command.settings(), &commit)
-        .set_tree_id(new_tree_id)
+        .set_tree_id(new_tree.id())
         .write()?;
     tx.finish(
         ui,
@@ -137,5 +171,10 @@ pub(crate) fn cmd_resolve(
             }
         }
     }
-    Ok(())
+
+    if let Some(err) = suppressed_err {
+        Err(err)
+    } else {
+        Ok(())
+    }
 }

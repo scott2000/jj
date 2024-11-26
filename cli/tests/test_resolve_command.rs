@@ -546,6 +546,192 @@ fn test_resolution() {
     // correctly.
 }
 
+#[test]
+fn test_resolution_with_all() {
+    let mut test_env = TestEnvironment::default();
+    test_env.jj_cmd_ok(test_env.env_root(), &["git", "init", "repo"]);
+    let repo_path = test_env.env_root().join("repo");
+
+    // Create two conflicted files, and one non-conflicted file
+    create_commit(
+        &test_env,
+        &repo_path,
+        "base",
+        &[],
+        &[
+            ("file1", "base1\n"),
+            ("file2", "base2\n"),
+            ("file3", "base3\n"),
+        ],
+    );
+    create_commit(
+        &test_env,
+        &repo_path,
+        "a",
+        &["base"],
+        &[("file1", "a1\n"), ("file2", "a2\n")],
+    );
+    create_commit(
+        &test_env,
+        &repo_path,
+        "b",
+        &["base"],
+        &[("file1", "b1\n"), ("file2", "b2\n")],
+    );
+    create_commit(&test_env, &repo_path, "conflict", &["a", "b"], &[]);
+    insta::assert_snapshot!(test_env.jj_cmd_success(&repo_path, &["resolve", "--list"]), 
+    @r#"
+    file1    2-sided conflict
+    file2    2-sided conflict
+    "#);
+    insta::assert_snapshot!(
+        std::fs::read_to_string(repo_path.join("file1")).unwrap(),
+        @r##"
+    <<<<<<< Conflict 1 of 1
+    %%%%%%% Changes from base to side #1
+    -base1
+    +a1
+    +++++++ Contents of side #2
+    b1
+    >>>>>>> Conflict 1 of 1 ends
+    "##
+    );
+    insta::assert_snapshot!(
+        std::fs::read_to_string(repo_path.join("file2")).unwrap(),
+        @r##"
+    <<<<<<< Conflict 1 of 1
+    %%%%%%% Changes from base to side #1
+    -base2
+    +a2
+    +++++++ Contents of side #2
+    b2
+    >>>>>>> Conflict 1 of 1 ends
+    "##
+    );
+    let editor_script = test_env.set_up_fake_editor();
+
+    // Test resolving both conflicts
+    std::fs::write(
+        &editor_script,
+        [
+            "write\nresolution1\n",
+            "next invocation\n",
+            "write\nresolution2\n",
+        ]
+        .join("\0"),
+    )
+    .unwrap();
+    let (stdout, stderr) = test_env.jj_cmd_ok(&repo_path, &["resolve", "--all"]);
+    insta::assert_snapshot!(stdout, @"");
+    insta::assert_snapshot!(stderr, @r#"
+    Resolving conflicts in: file1
+    Resolving conflicts in: file2
+    Working copy now at: vruxwmqv 8fffa1fb conflict | conflict
+    Parent commit      : zsuskuln 9db7fdfb a | a
+    Parent commit      : royxmykx d67e26e4 b | b
+    Added 0 files, modified 2 files, removed 0 files
+    "#);
+    insta::assert_snapshot!(test_env.jj_cmd_success(&repo_path, &["diff", "--git"]), 
+    @r##"
+    diff --git a/file1 b/file1
+    index 0000000000..95cc18629d 100644
+    --- a/file1
+    +++ b/file1
+    @@ -1,7 +1,1 @@
+    -<<<<<<< Conflict 1 of 1
+    -%%%%%%% Changes from base to side #1
+    --base1
+    -+a1
+    -+++++++ Contents of side #2
+    -b1
+    ->>>>>>> Conflict 1 of 1 ends
+    +resolution1
+    diff --git a/file2 b/file2
+    index 0000000000..775f078581 100644
+    --- a/file2
+    +++ b/file2
+    @@ -1,7 +1,1 @@
+    -<<<<<<< Conflict 1 of 1
+    -%%%%%%% Changes from base to side #1
+    --base2
+    -+a2
+    -+++++++ Contents of side #2
+    -b2
+    ->>>>>>> Conflict 1 of 1 ends
+    +resolution2
+    "##);
+    insta::assert_snapshot!(test_env.jj_cmd_cli_error(&repo_path, &["resolve", "--list"]), 
+    @r###"
+    Error: No conflicts found at this revision
+    "###);
+
+    // Test resolving one conflict, then exiting without resolving the second one
+    test_env.jj_cmd_ok(&repo_path, &["undo"]);
+    std::fs::write(
+        &editor_script,
+        ["write\nresolution1\n", "next invocation\n", "fail"].join("\0"),
+    )
+    .unwrap();
+    let stderr = test_env.jj_cmd_failure(&repo_path, &["resolve", "--all"]);
+    insta::assert_snapshot!(stderr, @r#"
+    Resolving conflicts in: file1
+    Resolving conflicts in: file2
+    Working copy now at: vruxwmqv 22b6cad7 conflict | (conflict) conflict
+    Parent commit      : zsuskuln 9db7fdfb a | a
+    Parent commit      : royxmykx d67e26e4 b | b
+    Added 0 files, modified 1 files, removed 0 files
+    There are unresolved conflicts at these paths:
+    file2    2-sided conflict
+    New conflicts appeared in these commits:
+      vruxwmqv 22b6cad7 conflict | (conflict) conflict
+    To resolve the conflicts, start by updating to it:
+      jj new vruxwmqv
+    Then use `jj resolve`, or edit the conflict markers in the file directly.
+    Once the conflicts are resolved, you may want to inspect the result with `jj diff`.
+    Then run `jj squash` to move the resolution into the conflicted commit.
+    Error: Failed to resolve conflicts
+    Caused by: Tool exited with exit status: 1 (run with --debug to see the exact invocation)
+    "#);
+    insta::assert_snapshot!(test_env.jj_cmd_success(&repo_path, &["diff", "--git"]), 
+    @r##"
+    diff --git a/file1 b/file1
+    index 0000000000..95cc18629d 100644
+    --- a/file1
+    +++ b/file1
+    @@ -1,7 +1,1 @@
+    -<<<<<<< Conflict 1 of 1
+    -%%%%%%% Changes from base to side #1
+    --base1
+    -+a1
+    -+++++++ Contents of side #2
+    -b1
+    ->>>>>>> Conflict 1 of 1 ends
+    +resolution1
+    "##);
+    insta::assert_snapshot!(
+        test_env.jj_cmd_success(&repo_path, &["resolve", "--list"]),
+        @"file2    2-sided conflict"
+    );
+
+    // Test immediately failing to resolve any conflict
+    test_env.jj_cmd_ok(&repo_path, &["undo"]);
+    std::fs::write(&editor_script, "fail").unwrap();
+    let stderr = test_env.jj_cmd_failure(&repo_path, &["resolve", "--all"]);
+    insta::assert_snapshot!(stderr, @r#"
+    Resolving conflicts in: file1
+    Error: Failed to resolve conflicts
+    Caused by: Tool exited with exit status: 1 (run with --debug to see the exact invocation)
+    "#);
+    insta::assert_snapshot!(test_env.jj_cmd_success(&repo_path, &["diff", "--git"]), @"");
+    insta::assert_snapshot!(
+        test_env.jj_cmd_success(&repo_path, &["resolve", "--list"]),
+        @r#"
+    file1    2-sided conflict
+    file2    2-sided conflict
+    "#
+    );
+}
+
 fn check_resolve_produces_input_file(
     test_env: &mut TestEnvironment,
     repo_path: &Path,

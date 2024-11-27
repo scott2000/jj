@@ -331,21 +331,6 @@ pub fn choose_materialized_conflict_marker_len<T: AsRef<[u8]>>(single_hunk: &Mer
 pub fn materialize_merge_result<T: AsRef<[u8]>>(
     single_hunk: &Merge<T>,
     conflict_marker_style: ConflictMarkerStyle,
-    output: &mut dyn Write,
-) -> io::Result<()> {
-    let conflict_marker_len = choose_materialized_conflict_marker_len(single_hunk);
-
-    materialize_merge_result_with_marker_len(
-        single_hunk,
-        conflict_marker_style,
-        conflict_marker_len,
-        output,
-    )
-}
-
-fn materialize_merge_result_with_marker_len<T: AsRef<[u8]>>(
-    single_hunk: &Merge<T>,
-    conflict_marker_style: ConflictMarkerStyle,
     conflict_marker_len: usize,
     output: &mut dyn Write,
 ) -> io::Result<()> {
@@ -361,12 +346,12 @@ fn materialize_merge_result_with_marker_len<T: AsRef<[u8]>>(
 pub fn materialize_merge_result_to_bytes<T: AsRef<[u8]>>(
     single_hunk: &Merge<T>,
     conflict_marker_style: ConflictMarkerStyle,
+    conflict_marker_len: usize,
 ) -> BString {
     let merge_result = files::merge(single_hunk);
     match merge_result {
         MergeResult::Resolved(content) => content,
         MergeResult::Conflict(hunks) => {
-            let conflict_marker_len = choose_materialized_conflict_marker_len(single_hunk);
             let mut output = Vec::new();
             materialize_conflict_hunks(
                 &hunks,
@@ -821,9 +806,14 @@ pub async fn update_from_content(
     path: &RepoPath,
     content: &[u8],
     conflict_marker_style: ConflictMarkerStyle,
+    materialized_conflict_marker_len: Option<usize>,
 ) -> BackendResult<Merge<Option<FileId>>> {
     let simplified_file_ids = file_ids.clone().simplify();
     let simplified_file_ids = &simplified_file_ids;
+
+    // If we don't have a known materialized conflict marker length, default to the
+    // minimum conflict marker length
+    let conflict_marker_len = materialized_conflict_marker_len.unwrap_or(MIN_CONFLICT_MARKER_LEN);
 
     // First check if the new content is unchanged compared to the old content. If
     // it is, we don't need parse the content or write any new objects to the
@@ -832,8 +822,7 @@ pub async fn update_from_content(
     // copy.
     let mut old_content = Vec::with_capacity(content.len());
     let merge_hunk = extract_as_single_hunk(simplified_file_ids, store, path).await?;
-    let conflict_marker_len = choose_materialized_conflict_marker_len(&merge_hunk);
-    materialize_merge_result_with_marker_len(
+    materialize_merge_result(
         &merge_hunk,
         conflict_marker_style,
         conflict_marker_len,

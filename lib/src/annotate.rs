@@ -32,6 +32,7 @@ use pollster::FutureExt;
 use crate::backend::BackendError;
 use crate::backend::CommitId;
 use crate::commit::Commit;
+use crate::conflicts::choose_materialized_conflict_marker_len;
 use crate::conflicts::materialize_merge_result_to_bytes;
 use crate::conflicts::materialize_tree_value;
 use crate::conflicts::ConflictMarkerStyle;
@@ -359,9 +360,13 @@ fn get_file_contents(
                 })?;
             Ok(file_contents.into())
         }
-        MaterializedTreeValue::FileConflict { contents, .. } => Ok(
-            materialize_merge_result_to_bytes(&contents, ConflictMarkerStyle::default()),
-        ),
+        MaterializedTreeValue::FileConflict { contents, .. } => {
+            Ok(materialize_merge_result_to_bytes(
+                &contents,
+                ConflictMarkerStyle::default(),
+                choose_materialized_conflict_marker_len(&contents),
+            ))
+        }
         _ => Ok(BString::default()),
     }
 }

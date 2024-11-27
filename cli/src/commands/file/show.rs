@@ -18,6 +18,7 @@ use std::io::Write;
 use clap_complete::ArgValueCandidates;
 use clap_complete::ArgValueCompleter;
 use jj_lib::backend::BackendResult;
+use jj_lib::conflicts::choose_materialized_conflict_marker_len;
 use jj_lib::conflicts::materialize_merge_result;
 use jj_lib::conflicts::materialize_tree_value;
 use jj_lib::conflicts::MaterializedTreeValue;
@@ -135,6 +136,7 @@ fn write_tree_entries<P: AsRef<RepoPath>>(
                 materialize_merge_result(
                     &contents,
                     workspace_command.env().conflict_marker_style(),
+                    choose_materialized_conflict_marker_len(&contents),
                     &mut ui.stdout_formatter(),
                 )?;
             }

@@ -42,6 +42,7 @@ use crate::backend::ChangeId;
 use crate::backend::CommitId;
 use crate::backend::MillisSinceEpoch;
 use crate::commit::Commit;
+use crate::conflicts::choose_materialized_conflict_marker_len;
 use crate::conflicts::materialize_merge_result_to_bytes;
 use crate::conflicts::materialize_tree_value;
 use crate::conflicts::ConflictMarkerStyle;
@@ -1347,7 +1348,12 @@ fn to_file_content(path: &RepoPath, value: MaterializedTreeValue) -> BackendResu
         MaterializedTreeValue::Symlink { id: _, target } => Ok(target.into_bytes()),
         MaterializedTreeValue::GitSubmodule(_) => Ok(vec![]),
         MaterializedTreeValue::FileConflict { contents, .. } => {
-            Ok(materialize_merge_result_to_bytes(&contents, ConflictMarkerStyle::default()).into())
+            Ok(materialize_merge_result_to_bytes(
+                &contents,
+                ConflictMarkerStyle::default(),
+                choose_materialized_conflict_marker_len(&contents),
+            )
+            .into())
         }
         MaterializedTreeValue::OtherConflict { .. } => Ok(vec![]),
         MaterializedTreeValue::Tree(id) => {

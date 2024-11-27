@@ -12,6 +12,7 @@ use jj_lib::backend::BackendResult;
 use jj_lib::backend::FileId;
 use jj_lib::backend::MergedTreeId;
 use jj_lib::backend::TreeValue;
+use jj_lib::conflicts::choose_materialized_conflict_marker_len;
 use jj_lib::conflicts::materialize_merge_result_to_bytes;
 use jj_lib::conflicts::materialize_tree_value;
 use jj_lib::conflicts::ConflictMarkerStyle;
@@ -213,7 +214,12 @@ fn read_file_contents(
             contents,
             executable: _,
         } => {
-            let buf = materialize_merge_result_to_bytes(&contents, conflict_marker_style).into();
+            let buf = materialize_merge_result_to_bytes(
+                &contents,
+                conflict_marker_style,
+                choose_materialized_conflict_marker_len(&contents),
+            )
+            .into();
             // TODO: Render the ID somehow?
             let contents = buf_to_file_contents(None, buf);
             Ok(FileInfo {

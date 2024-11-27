@@ -34,6 +34,7 @@ use jj_lib::backend::TreeValue;
 use jj_lib::commit::Commit;
 use jj_lib::config::ConfigGetError;
 use jj_lib::config::ConfigGetResultExt as _;
+use jj_lib::conflicts::choose_materialized_conflict_marker_len;
 use jj_lib::conflicts::materialize_merge_result_to_bytes;
 use jj_lib::conflicts::materialized_diff_stream;
 use jj_lib::conflicts::ConflictMarkerStyle;
@@ -906,7 +907,12 @@ fn diff_content(
             executable: _,
         } => Ok(FileContent {
             is_binary: false,
-            contents: materialize_merge_result_to_bytes(&contents, conflict_marker_style).into(),
+            contents: materialize_merge_result_to_bytes(
+                &contents,
+                conflict_marker_style,
+                choose_materialized_conflict_marker_len(&contents),
+            )
+            .into(),
         }),
         MaterializedTreeValue::OtherConflict { id } => Ok(FileContent {
             is_binary: false,
@@ -1221,8 +1227,12 @@ fn git_diff_part(
             hash = DUMMY_HASH.to_owned();
             content = FileContent {
                 is_binary: false, // TODO: are we sure this is never binary?
-                contents: materialize_merge_result_to_bytes(&contents, conflict_marker_style)
-                    .into(),
+                contents: materialize_merge_result_to_bytes(
+                    &contents,
+                    conflict_marker_style,
+                    choose_materialized_conflict_marker_len(&contents),
+                )
+                .into(),
             };
         }
         MaterializedTreeValue::OtherConflict { id } => {

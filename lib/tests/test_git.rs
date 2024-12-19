@@ -2164,6 +2164,13 @@ fn test_reset_head_with_index() {
     let temp_dir = testutils::new_temp_dir();
     let workspace_root = temp_dir.path().join("repo");
     let git_repo = git2::Repository::init(&workspace_root).unwrap();
+    // The index may be outdated compared to what was written to disk, so we want to
+    // reload it each time.
+    let read_index = || {
+        let mut index = git_repo.index().unwrap();
+        index.read(true).unwrap();
+        index
+    };
     let (_workspace, repo) =
         Workspace::init_external_git(&settings, &workspace_root, &workspace_root.join(".git"))
             .unwrap();
@@ -2184,22 +2191,28 @@ fn test_reset_head_with_index() {
 
     // Set Git HEAD to commit2's parent (i.e. commit1)
     git::reset_head(tx.repo_mut(), &git_repo, &commit2).unwrap();
-    assert!(git_repo.index().unwrap().is_empty());
+    assert!(read_index().is_empty());
 
     // Add "staged changes" to the Git index
-    let file_path = RepoPath::from_internal_string("file.txt");
-    testutils::write_working_copy_file(&workspace_root, file_path, "i am a file\n");
-    git_repo
-        .index()
-        .unwrap()
-        .add_path(&file_path.to_fs_path_unchecked(Path::new("")))
-        .unwrap();
-    assert!(!git_repo.index().unwrap().is_empty());
+    {
+        let file_path = RepoPath::from_internal_string("file.txt");
+        testutils::write_working_copy_file(&workspace_root, file_path, "i am a file\n");
+        let mut index = read_index();
+        index
+            .add_path(&file_path.to_fs_path_unchecked(Path::new("")))
+            .unwrap();
+        index.write().unwrap();
+    }
+    assert!(!read_index().is_empty());
 
-    // Reset head to and the Git index
+    // Reset head and the Git index
     git::reset_head(tx.repo_mut(), &git_repo, &commit2).unwrap();
-    assert!(git_repo.index().unwrap().is_empty());
+    assert!(read_index().is_empty());
 }
+
+// TODO: add test for nested directories being added to index properly
+// TODO: add test for file-directory conflicts in index
+// TODO: add test for tree containing ".jj-do-not-resolve-this-conflict" file
 
 #[test]
 fn test_init() {

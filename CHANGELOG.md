@@ -15,6 +15,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 * The `ui.allow-filesets` configuration option has been removed.
   [The "fileset" language](docs/filesets.md) has been enabled by default since v0.20.
 
+* `jj bookmark forget` now untracks any corresponding remote bookmarks instead
+  of forgetting them, since forgetting a remote bookmark can be unintuitive.
+  The old behavior is still available with the new `--include-remotes` flag.
+
 ### Deprecations
 
 ### New features

@@ -44,12 +44,15 @@ use crate::ui::Ui;
 
 const BOOKMARK_HELP_TEMPLATE: &str = r#"template-aliases.'bookmark_help()'='''
 " " ++
-if(normal_target,
-    if(normal_target.description(),
-        normal_target.description().first_line(),
-        "(no description set)",
+if(present,
+    if(normal_target,
+        if(normal_target.description(),
+            normal_target.description().first_line(),
+            "(no description set)",
+        ),
+        "(conflicted bookmark)",
     ),
-    "(conflicted bookmark)",
+    "(deleted)",
 )
 '''"#;
 

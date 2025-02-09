@@ -29,34 +29,34 @@ fn test_evolog_with_or_without_diff() {
     std::fs::write(repo_path.join("file1"), "resolved\n").unwrap();
 
     let stdout = test_env.jj_cmd_success(&repo_path, &["evolog"]);
-    insta::assert_snapshot!(stdout, @r###"
+    insta::assert_snapshot!(stdout, @r#"
     @  rlvkpnrz test.user@example.com 2001-02-03 08:05:10 66b42ad3
     │  my description
-    ×  rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 07b18245 conflict
+    ×  rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 52f34155 conflict
     │  my description
     ○  rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 068224a7
     │  my description
     ○  rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:08 2b023b5f
        (empty) my description
-    "###);
+    "#);
 
     // Color
     let stdout = test_env.jj_cmd_success(&repo_path, &["--color=always", "evolog"]);
-    insta::assert_snapshot!(stdout, @r###"
+    insta::assert_snapshot!(stdout, @r#"
     [1m[38;5;2m@[0m  [1m[38;5;13mr[38;5;8mlvkpnrz[39m [38;5;3mtest.user@example.com[39m [38;5;14m2001-02-03 08:05:10[39m [38;5;12m6[38;5;8m6b42ad3[39m[0m
     │  [1mmy description[0m
-    [1m[38;5;1m×[0m  [1m[39mr[0m[38;5;8mlvkpnrz[39m hidden [38;5;3mtest.user@example.com[39m [38;5;6m2001-02-03 08:05:09[39m [1m[38;5;4m07[0m[38;5;8mb18245[39m [38;5;1mconflict[39m
+    [1m[38;5;1m×[0m  [1m[39mr[0m[38;5;8mlvkpnrz[39m hidden [38;5;3mtest.user@example.com[39m [38;5;6m2001-02-03 08:05:09[39m [1m[38;5;4m5[0m[38;5;8m2f34155[39m [38;5;1mconflict[39m
     │  my description
     ○  [1m[39mr[0m[38;5;8mlvkpnrz[39m hidden [38;5;3mtest.user@example.com[39m [38;5;6m2001-02-03 08:05:09[39m [1m[38;5;4m06[0m[38;5;8m8224a7[39m
     │  my description
     ○  [1m[39mr[0m[38;5;8mlvkpnrz[39m hidden [38;5;3mtest.user@example.com[39m [38;5;6m2001-02-03 08:05:08[39m [1m[38;5;4m2b[0m[38;5;8m023b5f[39m
        [38;5;2m(empty)[39m my description
-    "###);
+    "#);
 
     // There should be no diff caused by the rebase because it was a pure rebase
     // (even even though it resulted in a conflict).
     let stdout = test_env.jj_cmd_success(&repo_path, &["evolog", "-p"]);
-    insta::assert_snapshot!(stdout, @r###"
+    insta::assert_snapshot!(stdout, @r##"
     @  rlvkpnrz test.user@example.com 2001-02-03 08:05:10 66b42ad3
     │  my description
     │  Resolved conflict in file1:
@@ -67,7 +67,7 @@ fn test_evolog_with_or_without_diff() {
     │     5     : foo
     │     6     : bar
     │     7    1: >>>>>>> Conflict 1 of 1 endsresolved
-    ×  rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 07b18245 conflict
+    ×  rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 52f34155 conflict
     │  my description
     ○  rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 068224a7
     │  my description
@@ -78,33 +78,33 @@ fn test_evolog_with_or_without_diff() {
     │          1: foo
     ○  rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:08 2b023b5f
        (empty) my description
-    "###);
+    "##);
 
     // Test `--limit`
     let stdout = test_env.jj_cmd_success(&repo_path, &["evolog", "--limit=2"]);
-    insta::assert_snapshot!(stdout, @r###"
+    insta::assert_snapshot!(stdout, @r#"
     @  rlvkpnrz test.user@example.com 2001-02-03 08:05:10 66b42ad3
     │  my description
-    ×  rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 07b18245 conflict
+    ×  rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 52f34155 conflict
     │  my description
-    "###);
+    "#);
 
     // Test `--no-graph`
     let stdout = test_env.jj_cmd_success(&repo_path, &["evolog", "--no-graph"]);
-    insta::assert_snapshot!(stdout, @r###"
+    insta::assert_snapshot!(stdout, @r#"
     rlvkpnrz test.user@example.com 2001-02-03 08:05:10 66b42ad3
     my description
-    rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 07b18245 conflict
+    rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 52f34155 conflict
     my description
     rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 068224a7
     my description
     rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:08 2b023b5f
     (empty) my description
-    "###);
+    "#);
 
     // Test `--git` format, and that it implies `-p`
     let stdout = test_env.jj_cmd_success(&repo_path, &["evolog", "--no-graph", "--git"]);
-    insta::assert_snapshot!(stdout, @r###"
+    insta::assert_snapshot!(stdout, @r##"
     rlvkpnrz test.user@example.com 2001-02-03 08:05:10 66b42ad3
     my description
     diff --git a/file1 b/file1
@@ -120,7 +120,7 @@ fn test_evolog_with_or_without_diff() {
     -bar
     ->>>>>>> Conflict 1 of 1 ends
     +resolved
-    rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 07b18245 conflict
+    rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 52f34155 conflict
     my description
     rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 068224a7
     my description
@@ -140,7 +140,7 @@ fn test_evolog_with_or_without_diff() {
     +foo
     rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:08 2b023b5f
     (empty) my description
-    "###);
+    "##);
 }
 
 #[test]
@@ -159,16 +159,16 @@ fn test_evolog_with_custom_symbols() {
     let config = "templates.log_node='if(current_working_copy, \"$\", \"┝\")'";
     let stdout = test_env.jj_cmd_success(&repo_path, &["evolog", "--config", config]);
 
-    insta::assert_snapshot!(stdout, @r###"
+    insta::assert_snapshot!(stdout, @r#"
     $  rlvkpnrz test.user@example.com 2001-02-03 08:05:10 66b42ad3
     │  my description
-    ┝  rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 07b18245 conflict
+    ┝  rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 52f34155 conflict
     │  my description
     ┝  rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 068224a7
     │  my description
     ┝  rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:08 2b023b5f
        (empty) my description
-    "###);
+    "#);
 }
 
 #[test]

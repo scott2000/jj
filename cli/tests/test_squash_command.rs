@@ -686,27 +686,27 @@ fn test_squash_from_multiple() {
     let (stdout, stderr) =
         test_env.jj_cmd_ok(&repo_path, &["squash", "--from=b", "--from=c", "--into=d"]);
     insta::assert_snapshot!(stdout, @"");
-    insta::assert_snapshot!(stderr, @r###"
+    insta::assert_snapshot!(stderr, @r#"
     Rebased 2 descendant commits
-    Working copy now at: kpqxywon 7ea39167 f | (no description set)
-    Parent commit      : yostqsxw acfbf2a0 e | (no description set)
+    Working copy now at: kpqxywon 02deec39 f | (no description set)
+    Parent commit      : yostqsxw d30d9958 e | (no description set)
     New conflicts appeared in these commits:
-      yqosqzyt 4df3b215 d | (conflict) (no description set)
+      yqosqzyt d3d6a595 d | (conflict) (no description set)
     To resolve the conflicts, start by updating to it:
       jj new yqosqzyt
     Then use `jj resolve`, or edit the conflict markers in the file directly.
     Once the conflicts are resolved, you may want to inspect the result with `jj diff`.
     Then run `jj squash` to move the resolution into the conflicted commit.
-    "###);
-    insta::assert_snapshot!(get_log_output(&test_env, &repo_path), @r###"
-    @  7ea391676d52 f
-    ○    acfbf2a0600d e
+    "#);
+    insta::assert_snapshot!(get_log_output(&test_env, &repo_path), @r#"
+    @  02deec395e4a f
+    ○    d30d9958c203 e
     ├─╮
-    × │  4df3b2156c3d d
+    × │  d3d6a595eeec d
     ├─╯
     ○  3b1673b6370c a b c
     ◆  000000000000 (empty)
-    "###);
+    "#);
     // The changes from the sources have been applied
     let stdout = test_env.jj_cmd_success(&repo_path, &["file", "show", "-r=d", "file"]);
     insta::assert_snapshot!(stdout, @r###"
@@ -811,30 +811,30 @@ fn test_squash_from_multiple_partial() {
     let (stdout, stderr) =
         test_env.jj_cmd_ok(&repo_path, &["squash", "--from=b|c", "--into=d", "file1"]);
     insta::assert_snapshot!(stdout, @"");
-    insta::assert_snapshot!(stderr, @r###"
+    insta::assert_snapshot!(stderr, @r#"
     Rebased 2 descendant commits
-    Working copy now at: kpqxywon a8530305 f | (no description set)
-    Parent commit      : yostqsxw 0a3637fc e | (no description set)
+    Working copy now at: kpqxywon 3bb9fe76 f | (no description set)
+    Parent commit      : yostqsxw 5cf6d207 e | (no description set)
     New conflicts appeared in these commits:
-      yqosqzyt 05a3ab3d d | (conflict) (no description set)
+      yqosqzyt 242f76c9 d | (conflict) (no description set)
     To resolve the conflicts, start by updating to it:
       jj new yqosqzyt
     Then use `jj resolve`, or edit the conflict markers in the file directly.
     Once the conflicts are resolved, you may want to inspect the result with `jj diff`.
     Then run `jj squash` to move the resolution into the conflicted commit.
-    "###);
-    insta::assert_snapshot!(get_log_output(&test_env, &repo_path), @r###"
-    @  a8530305127c f
-    ○      0a3637fca632 e
+    "#);
+    insta::assert_snapshot!(get_log_output(&test_env, &repo_path), @r#"
+    @  3bb9fe76f14d f
+    ○      5cf6d207d084 e
     ├─┬─╮
     │ │ ○  450d1499c1ae b
     │ ○ │  14b44bf0473c c
     │ ├─╯
-    × │  05a3ab3dffc8 d
+    × │  242f76c9e764 d
     ├─╯
     ○  54d3c1c0e9fd a
     ◆  000000000000 (empty)
-    "###);
+    "#);
     // The selected changes have been removed from the sources
     let stdout = test_env.jj_cmd_success(&repo_path, &["file", "show", "-r=b", "file1"]);
     insta::assert_snapshot!(stdout, @r###"

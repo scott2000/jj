@@ -1259,20 +1259,7 @@ impl Backend for GitBackend {
                 extra_headers: extra_headers.clone(),
             };
 
-            if let Some(sign) = &mut sign_with {
-                // we don't use gix pool, but at least use their heuristic
-                let mut data = Vec::with_capacity(512);
-                commit.write_to(&mut data).unwrap();
-
-                let sig = sign(&data).map_err(|err| BackendError::WriteObject {
-                    object_type: "commit",
-                    source: Box::new(err),
-                })?;
-                commit
-                    .extra_headers
-                    .push(("gpgsig".into(), sig.clone().into()));
-                contents.secure_sig = Some(SecureSig { data, sig });
-            }
+            contents.secure_sig = sign_commit(&mut commit, &mut sign_with)?;
 
             let git_id =
                 locked_repo
@@ -1455,6 +1442,28 @@ recover.
             source: Box::new(err),
         })?;
     Ok(id.detach())
+}
+
+fn sign_commit(
+    commit: &mut gix::objs::Commit,
+    sign_with: &mut Option<&mut SigningFn>,
+) -> BackendResult<Option<SecureSig>> {
+    if let Some(sign) = sign_with {
+        // We don't use gix pool, but at least use their heuristic
+        let mut data = Vec::with_capacity(512);
+        commit.write_to(&mut data).unwrap();
+
+        let sig = sign(&data).map_err(|err| BackendError::WriteObject {
+            object_type: "commit",
+            source: Box::new(err),
+        })?;
+        commit
+            .extra_headers
+            .push(("gpgsig".into(), sig.clone().into()));
+        Ok(Some(SecureSig { data, sig }))
+    } else {
+        Ok(None)
+    }
 }
 
 fn conflict_term_list_to_json(parts: &[ConflictTerm]) -> serde_json::Value {

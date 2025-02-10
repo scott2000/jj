@@ -731,7 +731,7 @@ fn test_files() {
     │  A f_dir/dir_file_3
     │  M f_modified
     │  A f_renamed
-    │ ×  royxmykx test.user@example.com 2001-02-03 08:05:14 conflicted 1581b8d4 conflict
+    │ ×  royxmykx test.user@example.com 2001-02-03 08:05:14 conflicted 88650932 conflict
     ├─╯  conflicted
     │    A f_added_2
     │    A f_dir/dir_file_1

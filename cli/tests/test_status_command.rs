@@ -180,11 +180,11 @@ fn test_status_display_relevant_working_commit_conflict_hints() {
     let stdout = test_env.jj_cmd_success(&repo_path, &["log", "-r", "::"]);
 
     insta::assert_snapshot!(stdout, @r#"
-    @  yqosqzyt test.user@example.com 2001-02-03 08:05:13 cdbac018 conflict
+    @  yqosqzyt test.user@example.com 2001-02-03 08:05:13 2e45e427 conflict
     │  (empty) boom-cont-2
-    ×  royxmykx test.user@example.com 2001-02-03 08:05:12 5eebe57b conflict
+    ×  royxmykx test.user@example.com 2001-02-03 08:05:12 cb4d8d57 conflict
     │  (empty) boom-cont
-    ×    mzvwutvl test.user@example.com 2001-02-03 08:05:11 3afc7893 conflict
+    ×    mzvwutvl test.user@example.com 2001-02-03 08:05:11 f2848265 conflict
     ├─╮  (empty) boom
     │ ○  kkmpptxz test.user@example.com 2001-02-03 08:05:10 1e8c2956
     │ │  First part of conflicting change
@@ -201,8 +201,8 @@ fn test_status_display_relevant_working_commit_conflict_hints() {
     The working copy is clean
     There are unresolved conflicts at these paths:
     conflicted.txt    2-sided conflict
-    Working copy : yqosqzyt cdbac018 (conflict) (empty) boom-cont-2
-    Parent commit: royxmykx 5eebe57b (conflict) (empty) boom-cont
+    Working copy : yqosqzyt 2e45e427 (conflict) (empty) boom-cont-2
+    Parent commit: royxmykx cb4d8d57 (conflict) (empty) boom-cont
     To resolve the conflicts, start by updating to the first one:
       jj new mzvwutvl
     Then use `jj resolve`, or edit the conflict markers in the file directly.
@@ -222,15 +222,15 @@ fn test_status_display_relevant_working_commit_conflict_hints() {
     let stdout = test_env.jj_cmd_success(&repo_path, &["log", "-r", "::"]);
 
     insta::assert_snapshot!(stdout, @r#"
-    @  kpqxywon test.user@example.com 2001-02-03 08:05:18 c74d0aa8
+    @  kpqxywon test.user@example.com 2001-02-03 08:05:18 bde1d8f3
     │  fixed 2
-    ○  znkkpsqq test.user@example.com 2001-02-03 08:05:17 7538015c
+    ○  znkkpsqq test.user@example.com 2001-02-03 08:05:17 8d92f5cf
     │  fixed 1
-    ×  yqosqzyt test.user@example.com 2001-02-03 08:05:13 cdbac018 conflict
+    ×  yqosqzyt test.user@example.com 2001-02-03 08:05:13 2e45e427 conflict
     │  (empty) boom-cont-2
-    ×  royxmykx test.user@example.com 2001-02-03 08:05:12 5eebe57b conflict
+    ×  royxmykx test.user@example.com 2001-02-03 08:05:12 cb4d8d57 conflict
     │  (empty) boom-cont
-    ×    mzvwutvl test.user@example.com 2001-02-03 08:05:11 3afc7893 conflict
+    ×    mzvwutvl test.user@example.com 2001-02-03 08:05:11 f2848265 conflict
     ├─╮  (empty) boom
     │ ○  kkmpptxz test.user@example.com 2001-02-03 08:05:10 1e8c2956
     │ │  First part of conflicting change
@@ -246,8 +246,8 @@ fn test_status_display_relevant_working_commit_conflict_hints() {
     insta::assert_snapshot!(stdout, @r#"
     Working copy changes:
     M conflicted.txt
-    Working copy : kpqxywon c74d0aa8 fixed 2
-    Parent commit: znkkpsqq 7538015c fixed 1
+    Working copy : kpqxywon bde1d8f3 fixed 2
+    Parent commit: znkkpsqq 8d92f5cf fixed 1
     "#);
 
     // Step back one.
@@ -256,15 +256,15 @@ fn test_status_display_relevant_working_commit_conflict_hints() {
     let stdout = test_env.jj_cmd_success(&repo_path, &["log", "-r", "::"]);
 
     insta::assert_snapshot!(stdout, @r#"
-    ○  kpqxywon test.user@example.com 2001-02-03 08:05:18 c74d0aa8
+    ○  kpqxywon test.user@example.com 2001-02-03 08:05:18 bde1d8f3
     │  fixed 2
-    @  znkkpsqq test.user@example.com 2001-02-03 08:05:17 7538015c
+    @  znkkpsqq test.user@example.com 2001-02-03 08:05:17 8d92f5cf
     │  fixed 1
-    ×  yqosqzyt test.user@example.com 2001-02-03 08:05:13 cdbac018 conflict
+    ×  yqosqzyt test.user@example.com 2001-02-03 08:05:13 2e45e427 conflict
     │  (empty) boom-cont-2
-    ×  royxmykx test.user@example.com 2001-02-03 08:05:12 5eebe57b conflict
+    ×  royxmykx test.user@example.com 2001-02-03 08:05:12 cb4d8d57 conflict
     │  (empty) boom-cont
-    ×    mzvwutvl test.user@example.com 2001-02-03 08:05:11 3afc7893 conflict
+    ×    mzvwutvl test.user@example.com 2001-02-03 08:05:11 f2848265 conflict
     ├─╮  (empty) boom
     │ ○  kkmpptxz test.user@example.com 2001-02-03 08:05:10 1e8c2956
     │ │  First part of conflicting change
@@ -280,8 +280,8 @@ fn test_status_display_relevant_working_commit_conflict_hints() {
     insta::assert_snapshot!(stdout, @r#"
     Working copy changes:
     M conflicted.txt
-    Working copy : znkkpsqq 7538015c fixed 1
-    Parent commit: yqosqzyt cdbac018 (conflict) (empty) boom-cont-2
+    Working copy : znkkpsqq 8d92f5cf fixed 1
+    Parent commit: yqosqzyt 2e45e427 (conflict) (empty) boom-cont-2
     Conflict in parent commit has been resolved in working copy
     "#);
 
@@ -292,15 +292,15 @@ fn test_status_display_relevant_working_commit_conflict_hints() {
     let stdout = test_env.jj_cmd_success(&repo_path, &["log", "-r", "::"]);
 
     insta::assert_snapshot!(stdout, @r#"
-    ○  kpqxywon test.user@example.com 2001-02-03 08:05:18 c74d0aa8
+    ○  kpqxywon test.user@example.com 2001-02-03 08:05:18 bde1d8f3
     │  fixed 2
-    ○  znkkpsqq test.user@example.com 2001-02-03 08:05:17 7538015c
+    ○  znkkpsqq test.user@example.com 2001-02-03 08:05:17 8d92f5cf
     │  fixed 1
-    ×  yqosqzyt test.user@example.com 2001-02-03 08:05:13 cdbac018 conflict
+    ×  yqosqzyt test.user@example.com 2001-02-03 08:05:13 2e45e427 conflict
     │  (empty) boom-cont-2
-    ×  royxmykx test.user@example.com 2001-02-03 08:05:12 5eebe57b conflict
+    ×  royxmykx test.user@example.com 2001-02-03 08:05:12 cb4d8d57 conflict
     │  (empty) boom-cont
-    ×    mzvwutvl test.user@example.com 2001-02-03 08:05:11 3afc7893 conflict
+    ×    mzvwutvl test.user@example.com 2001-02-03 08:05:11 f2848265 conflict
     ├─╮  (empty) boom
     │ ○  kkmpptxz test.user@example.com 2001-02-03 08:05:10 1e8c2956
     │ │  First part of conflicting change
@@ -357,9 +357,9 @@ fn test_status_simplify_conflict_sides() {
     There are unresolved conflicts at these paths:
     fileA    2-sided conflict
     fileB    2-sided conflict
-    Working copy : nkmrtpmo f61ab8f1 conflict | (conflict) (empty) conflict
-    Parent commit: kmkuslsw 768e96eb conflictA | (conflict) (empty) conflictA
-    Parent commit: lylxulpl 8b9a98b0 conflictB | (conflict) (empty) conflictB
+    Working copy : nkmrtpmo 5aa694d7 conflict | (conflict) (empty) conflict
+    Parent commit: kmkuslsw df8bf9b4 conflictA | (conflict) (empty) conflictA
+    Parent commit: lylxulpl e97795c2 conflictB | (conflict) (empty) conflictB
     To resolve the conflicts, start by updating to one of the first ones:
       jj new lylxulpl
       jj new kmkuslsw

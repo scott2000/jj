@@ -890,7 +890,7 @@ fn test_git_colocated_update_index_merge_conflict() {
     test_env.jj_cmd_ok(&repo_path, &["new", "left", "right"]);
 
     insta::assert_snapshot!(get_log_output(&test_env, &repo_path), @r#"
-    @    5ae23e37931ad27faac5c2b3de911c62d9ab24ce
+    @    5b28403c2f7a67333e1a43dfa47112d2a224a052
     ├─╮
     │ ○  df62ad35fc873e89ade730fa9a407cd5cfa5e6ba right
     ○ │  68cc2177623364e4f0719d6ec8da1d6ea8d6087e left git_head()
@@ -913,8 +913,8 @@ fn test_git_colocated_update_index_merge_conflict() {
     test_env.jj_cmd_ok(&repo_path, &["new"]);
 
     insta::assert_snapshot!(get_log_output(&test_env, &repo_path), @r#"
-    @  55680b4cd84c589bbfac59c33d42438445696e5c
-    ×    5ae23e37931ad27faac5c2b3de911c62d9ab24ce git_head()
+    @  b20b64fbf5fa5349b2547b949631df816243369e
+    ×    5b28403c2f7a67333e1a43dfa47112d2a224a052 git_head()
     ├─╮
     │ ○  df62ad35fc873e89ade730fa9a407cd5cfa5e6ba right
     ○ │  68cc2177623364e4f0719d6ec8da1d6ea8d6087e left
@@ -982,7 +982,7 @@ fn test_git_colocated_update_index_rebase_conflict() {
     test_env.jj_cmd_ok(&repo_path, &["rebase", "-r", "left", "-d", "right"]);
 
     insta::assert_snapshot!(get_log_output(&test_env, &repo_path), @r#"
-    @  409770d955cc7608f5915edf535971c173a3da77 left
+    @  bd378a5bc8c0848414cb4baac5df681232434fc3 left
     ○  df62ad35fc873e89ade730fa9a407cd5cfa5e6ba right git_head()
     ○  14b3ff6c73a234ab2a26fc559512e0f056a46bd9 base
     ◆  0000000000000000000000000000000000000000
@@ -999,8 +999,8 @@ fn test_git_colocated_update_index_rebase_conflict() {
     test_env.jj_cmd_ok(&repo_path, &["new"]);
 
     insta::assert_snapshot!(get_log_output(&test_env, &repo_path), @r#"
-    @  89206225b10c72f828b2d3cabeb3cfab4ff245f0
-    ×  409770d955cc7608f5915edf535971c173a3da77 left git_head()
+    @  65e8bb63f213602e8ab27335bfd19ec7a87de2fb
+    ×  bd378a5bc8c0848414cb4baac5df681232434fc3 left git_head()
     ○  df62ad35fc873e89ade730fa9a407cd5cfa5e6ba right
     ○  14b3ff6c73a234ab2a26fc559512e0f056a46bd9 base
     ◆  0000000000000000000000000000000000000000
@@ -1061,7 +1061,7 @@ fn test_git_colocated_update_index_3_sided_conflict() {
     test_env.jj_cmd_ok(&repo_path, &["new", "side-1", "side-2", "side-3"]);
 
     insta::assert_snapshot!(get_log_output(&test_env, &repo_path), @r#"
-    @      be5267d1f44c06e7f6a75a1e2f3569da165194e0
+    @      ba63fa047b7059f96117201bba307fff48e8ea34
     ├─┬─╮
     │ │ ○  86e722ea6a9da2551f1e05bc9aa914acd1cb2304 side-3
     │ ○ │  b8b9ca2d8178c4ba727a61e2258603f30ac7c6d3 side-2
@@ -1086,8 +1086,8 @@ fn test_git_colocated_update_index_3_sided_conflict() {
     test_env.jj_cmd_ok(&repo_path, &["new"]);
 
     insta::assert_snapshot!(get_log_output(&test_env, &repo_path), @r#"
-    @  80b8680380390bdeef97b01d4fa4c51feb361951
-    ×      be5267d1f44c06e7f6a75a1e2f3569da165194e0 git_head()
+    @  0bf42e95809e061f791a02464da711aeea72272f
+    ×      ba63fa047b7059f96117201bba307fff48e8ea34 git_head()
     ├─┬─╮
     │ │ ○  86e722ea6a9da2551f1e05bc9aa914acd1cb2304 side-3
     │ ○ │  b8b9ca2d8178c4ba727a61e2258603f30ac7c6d3 side-2

@@ -158,12 +158,12 @@ fn test_absorb_replace_single_line_hunk() {
     let (_stdout, stderr) = test_env.jj_cmd_ok(&repo_path, &["absorb"]);
     insta::assert_snapshot!(stderr, @r#"
     Absorbed changes into these revisions:
-      qpvuntsm 19b5f23e (conflict) 1
+      qpvuntsm 999ca6b2 (conflict) 1
     Rebased 1 descendant commits.
-    Working copy now at: mzvwutvl d22d27f5 (empty) (no description set)
-    Parent commit      : kkmpptxz aba2f9ff 2
+    Working copy now at: mzvwutvl d9156339 (empty) (no description set)
+    Parent commit      : kkmpptxz c7d1b296 2
     New conflicts appeared in these commits:
-      qpvuntsm 19b5f23e (conflict) 1
+      qpvuntsm 999ca6b2 (conflict) 1
     To resolve the conflicts, start by updating to it:
       jj new qpvuntsm
     Then use `jj resolve`, or edit the conflict markers in the file directly.
@@ -172,8 +172,8 @@ fn test_absorb_replace_single_line_hunk() {
     "#);
 
     insta::assert_snapshot!(get_diffs(&test_env, &repo_path, "mutable()"), @r##"
-    @  mzvwutvl d22d27f5 (empty) (no description set)
-    ○  kkmpptxz aba2f9ff 2
+    @  mzvwutvl d9156339 (empty) (no description set)
+    ○  kkmpptxz c7d1b296 2
     │  diff --git a/file1 b/file1
     │  index 0000000000..2f87e8e465 100644
     │  --- a/file1
@@ -189,7 +189,7 @@ fn test_absorb_replace_single_line_hunk() {
     │   1A
     │   2b
     │  ->>>>>>> Conflict 1 of 1 ends
-    ×  qpvuntsm 19b5f23e (conflict) 1
+    ×  qpvuntsm 999ca6b2 (conflict) 1
     │  diff --git a/file1 b/file1
     ~  new file mode 100644
        index 0000000000..0000000000
@@ -394,13 +394,13 @@ fn test_absorb_conflict() {
     let (_stdout, stderr) = test_env.jj_cmd_ok(&repo_path, &["rebase", "-r@", "-ddescription(1)"]);
     insta::assert_snapshot!(stderr, @r#"
     Rebased 1 commits onto destination
-    Working copy now at: kkmpptxz 6d3b83e5 (conflict) (no description set)
+    Working copy now at: kkmpptxz 1ca3efe7 (conflict) (no description set)
     Parent commit      : qpvuntsm 3619e4e5 1
     Added 0 files, modified 1 files, removed 0 files
     There are unresolved conflicts at these paths:
     file1    2-sided conflict
     New conflicts appeared in these commits:
-      kkmpptxz 6d3b83e5 (conflict) (no description set)
+      kkmpptxz 1ca3efe7 (conflict) (no description set)
     To resolve the conflicts, start by updating to it:
       jj new kkmpptxz
     Then use `jj resolve`, or edit the conflict markers in the file directly.

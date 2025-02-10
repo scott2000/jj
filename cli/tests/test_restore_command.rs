@@ -61,13 +61,13 @@ fn test_restore() {
     insta::assert_snapshot!(stderr, @r#"
     Created rlvkpnrz b9b6011e (empty) (no description set)
     Rebased 1 descendant commits
-    Working copy now at: kkmpptxz c5b6bfa9 (conflict) (no description set)
+    Working copy now at: kkmpptxz 153f137b (conflict) (no description set)
     Parent commit      : rlvkpnrz b9b6011e (empty) (no description set)
     Added 0 files, modified 1 files, removed 0 files
     There are unresolved conflicts at these paths:
     file2    2-sided conflict including 1 deletion
     New conflicts appeared in these commits:
-      kkmpptxz c5b6bfa9 (conflict) (no description set)
+      kkmpptxz 153f137b (conflict) (no description set)
     To resolve the conflicts, start by updating to it:
       jj new kkmpptxz
     Then use `jj resolve`, or edit the conflict markers in the file directly.
@@ -199,8 +199,8 @@ fn test_restore_conflicted_merge() {
     let (stdout, stderr) = test_env.jj_cmd_ok(&repo_path, &["restore", "file"]);
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r#"
-    Created vruxwmqv 39bce8b8 conflict | (conflict) (empty) conflict
-    Working copy now at: vruxwmqv 39bce8b8 conflict | (conflict) (empty) conflict
+    Created vruxwmqv 4f06f469 conflict | (conflict) (empty) conflict
+    Working copy now at: vruxwmqv 4f06f469 conflict | (conflict) (empty) conflict
     Parent commit      : zsuskuln aa493daf a | a
     Parent commit      : royxmykx db6a4daf b | b
     Added 0 files, modified 1 files, removed 0 files
@@ -240,8 +240,8 @@ fn test_restore_conflicted_merge() {
     let (stdout, stderr) = test_env.jj_cmd_ok(&repo_path, &["restore"]);
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r#"
-    Created vruxwmqv 4d3b3430 conflict | (conflict) (empty) conflict
-    Working copy now at: vruxwmqv 4d3b3430 conflict | (conflict) (empty) conflict
+    Created vruxwmqv 88786547 conflict | (conflict) (empty) conflict
+    Working copy now at: vruxwmqv 88786547 conflict | (conflict) (empty) conflict
     Parent commit      : zsuskuln aa493daf a | a
     Parent commit      : royxmykx db6a4daf b | b
     Added 0 files, modified 1 files, removed 0 files

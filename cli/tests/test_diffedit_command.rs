@@ -330,15 +330,15 @@ fn test_diffedit_external_tool_conflict_marker_style() {
     let (stdout, stderr) = test_env.jj_cmd_ok(&repo_path, &["diffedit"]);
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r#"
-    Created mzvwutvl 8078ef31 (conflict) (empty) (no description set)
-    Working copy now at: mzvwutvl 8078ef31 (conflict) (empty) (no description set)
+    Created mzvwutvl 92d505cb (conflict) (empty) (no description set)
+    Working copy now at: mzvwutvl 92d505cb (conflict) (empty) (no description set)
     Parent commit      : rlvkpnrz 3765cc27 side-a
     Parent commit      : zsuskuln 8b3de837 side-b
     Added 0 files, modified 1 files, removed 0 files
     There are unresolved conflicts at these paths:
     file    2-sided conflict
     Existing conflicts were resolved or abandoned from these commits:
-      mzvwutvl hidden 5487bd30 (conflict) (no description set)
+      mzvwutvl hidden 56fae12f (conflict) (no description set)
     "#);
     // Conflicts should render using "snapshot" format in diff editor
     insta::assert_snapshot!(
@@ -413,7 +413,7 @@ fn test_diffedit_external_tool_conflict_marker_style() {
     The working copy is clean
     There are unresolved conflicts at these paths:
     file    2-sided conflict
-    Working copy : mzvwutvl 8078ef31 (conflict) (empty) (no description set)
+    Working copy : mzvwutvl 92d505cb (conflict) (empty) (no description set)
     Parent commit: rlvkpnrz 3765cc27 side-a
     Parent commit: zsuskuln 8b3de837 side-b
     "#);
@@ -574,10 +574,10 @@ fn test_diffedit_merge() {
     let (stdout, stderr) = test_env.jj_cmd_ok(&repo_path, &["diffedit", "-r", "@-"]);
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r#"
-    Created royxmykx 57be70e3 (conflict) merge
+    Created royxmykx e65a7642 (conflict) merge
     Rebased 1 descendant commits
-    Working copy now at: yqosqzyt ab898c27 (conflict) (empty) (no description set)
-    Parent commit      : royxmykx 57be70e3 (conflict) merge
+    Working copy now at: yqosqzyt 15bcd332 (conflict) (empty) (no description set)
+    Parent commit      : royxmykx e65a7642 (conflict) merge
     Added 0 files, modified 0 files, removed 1 files
     There are unresolved conflicts at these paths:
     file2    2-sided conflict

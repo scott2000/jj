@@ -688,10 +688,10 @@ fn test_squash_from_multiple() {
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r#"
     Rebased 2 descendant commits
-    Working copy now at: kpqxywon 02deec39 f | (no description set)
-    Parent commit      : yostqsxw d30d9958 e | (no description set)
+    Working copy now at: kpqxywon e4f333b1 f | (no description set)
+    Parent commit      : yostqsxw d9f6b09d e | (no description set)
     New conflicts appeared in these commits:
-      yqosqzyt d3d6a595 d | (conflict) (no description set)
+      yqosqzyt 3b5d986d d | (conflict) (no description set)
     To resolve the conflicts, start by updating to it:
       jj new yqosqzyt
     Then use `jj resolve`, or edit the conflict markers in the file directly.
@@ -699,10 +699,10 @@ fn test_squash_from_multiple() {
     Then run `jj squash` to move the resolution into the conflicted commit.
     "#);
     insta::assert_snapshot!(get_log_output(&test_env, &repo_path), @r#"
-    @  02deec395e4a f
-    ○    d30d9958c203 e
+    @  e4f333b15897 f
+    ○    d9f6b09d8af3 e
     ├─╮
-    × │  d3d6a595eeec d
+    × │  3b5d986d848a d
     ├─╯
     ○  3b1673b6370c a b c
     ◆  000000000000 (empty)
@@ -813,10 +813,10 @@ fn test_squash_from_multiple_partial() {
     insta::assert_snapshot!(stdout, @"");
     insta::assert_snapshot!(stderr, @r#"
     Rebased 2 descendant commits
-    Working copy now at: kpqxywon 3bb9fe76 f | (no description set)
-    Parent commit      : yostqsxw 5cf6d207 e | (no description set)
+    Working copy now at: kpqxywon de8cd914 f | (no description set)
+    Parent commit      : yostqsxw 4ce629e2 e | (no description set)
     New conflicts appeared in these commits:
-      yqosqzyt 242f76c9 d | (conflict) (no description set)
+      yqosqzyt 69a5619a d | (conflict) (no description set)
     To resolve the conflicts, start by updating to it:
       jj new yqosqzyt
     Then use `jj resolve`, or edit the conflict markers in the file directly.
@@ -824,13 +824,13 @@ fn test_squash_from_multiple_partial() {
     Then run `jj squash` to move the resolution into the conflicted commit.
     "#);
     insta::assert_snapshot!(get_log_output(&test_env, &repo_path), @r#"
-    @  3bb9fe76f14d f
-    ○      5cf6d207d084 e
+    @  de8cd9143250 f
+    ○      4ce629e23e5c e
     ├─┬─╮
     │ │ ○  450d1499c1ae b
     │ ○ │  14b44bf0473c c
     │ ├─╯
-    × │  242f76c9e764 d
+    × │  69a5619ab239 d
     ├─╯
     ○  54d3c1c0e9fd a
     ◆  000000000000 (empty)

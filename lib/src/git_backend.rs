@@ -96,6 +96,8 @@ const CONFLICT_SUFFIX: &str = ".jjconflict";
 const JJ_TREES_COMMIT_HEADER: &[u8] = b"jj:trees";
 const JJ_TREES_COMMIT_HEADER_V2: &[u8] = b"jj:trees-v2";
 
+const JJ_CONFLICT_README: &str = "JJ-CONFLICT-README";
+
 #[derive(Debug, Error)]
 pub enum GitBackendInitError {
     #[error("Failed to initialize git repository")]
@@ -1214,8 +1216,7 @@ impl Backend for GitBackend {
             MergedTreeId::Legacy(tree_id) => validate_git_object_id(tree_id)?,
             MergedTreeId::Merge(tree_ids) => match tree_ids.as_resolved() {
                 Some(tree_id) => validate_git_object_id(tree_id)?,
-                // TODO: add "JJ-CONFLICT-README" file to tree for conflict
-                None => validate_git_object_id(tree_ids.first())?,
+                None => write_tree_conflict(&locked_repo, tree_ids)?,
             },
         };
         let author = signature_to_git(&contents.author);
@@ -1469,6 +1470,73 @@ contains metadata about a conflict.
         })?;
 
     Ok(git_id.detach())
+}
+
+/// When writing a conflicted commit, we use the first side of the conflict as
+/// the tree, but we add a "JJ-CONFLICT-README" file explaining that the commit
+/// has a conflict.
+fn write_tree_conflict(
+    repo: &gix::Repository,
+    conflict: &Merge<TreeId>,
+) -> BackendResult<gix::ObjectId> {
+    let first_tree_id = validate_git_object_id(conflict.first())?;
+    let first_tree = repo
+        .find_tree(first_tree_id)
+        .map_err(|err| BackendError::ReadObject {
+            object_type: "tree".into(),
+            hash: first_tree_id.to_hex().to_string(),
+            source: Box::new(err),
+        })?;
+    let first_tree_ref = first_tree
+        .decode()
+        .map_err(|err| BackendError::ReadObject {
+            object_type: "tree".into(),
+            hash: first_tree_id.to_hex().to_string(),
+            source: Box::new(err),
+        })?;
+    let mut entries = first_tree_ref
+        .entries
+        .iter()
+        .filter(|&entry_ref| entry_ref.filename != JJ_CONFLICT_README)
+        .map(|&entry_ref| gix::objs::tree::Entry {
+            mode: entry_ref.mode,
+            filename: entry_ref.filename.to_owned(),
+            oid: entry_ref.oid.to_owned(),
+        })
+        .collect_vec();
+    entries.push(gix::objs::tree::Entry {
+        mode: gix::object::tree::EntryKind::Blob.into(),
+        filename: JJ_CONFLICT_README.into(),
+        oid: write_conflict_readme(repo)?,
+    });
+    entries.sort_unstable();
+    let id = repo
+        .write_object(gix::objs::Tree { entries })
+        .map_err(|err| BackendError::WriteObject {
+            object_type: "tree",
+            source: Box::new(err),
+        })?;
+    Ok(id.detach())
+}
+
+/// Writes a blob for "JJ-CONFLICT-README" that explains conflicts.
+fn write_conflict_readme(repo: &gix::Repository) -> BackendResult<gix::ObjectId> {
+    let readme_id = repo
+        .write_blob(
+            r#"This commit was made by jj (https://github.com/jj-vcs/jj). The commit contains
+conflicts, but these conflicts can only be resolved in jj. If you check out this
+commit in git, it will only show one of the sides of the conflict.
+
+If you've checked out the commit properly using `jj`, you should see this
+JJ-CONFLICT-README file staged as "deleted" in `git status`. Otherwise, if you
+see this file in your working copy, it probably means that you used a regular
+`git` command to check out a conflicted commit. Use `jj abandon` to recover.
+"#,
+        )
+        .map_err(|err| {
+            BackendError::Other(format!("Failed to write README for conflict tree: {err}").into())
+        })?;
+    Ok(readme_id.detach())
 }
 
 fn sign_commit(
@@ -2023,7 +2091,10 @@ mod tests {
             .find_commit(Oid::from_bytes(read_commit_id.as_bytes()).unwrap())
             .unwrap();
         let git_tree = git_repo.find_tree(git_commit.tree_id()).unwrap();
-        insta::assert_snapshot!(format_tree(&git_tree), @"100644 920e939f255ebe015d7f74c8288594d1e0baa73d file2");
+        insta::assert_snapshot!(format_tree(&git_tree), @r#"
+        100644 5b58e055e942b49e1ba0c799bb7eca7f10e7791a JJ-CONFLICT-README
+        100644 920e939f255ebe015d7f74c8288594d1e0baa73d file2
+        "#);
 
         // The last parent is a special metadata commit that contains references to all
         // of the conflict trees

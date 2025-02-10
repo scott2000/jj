@@ -47,9 +47,9 @@ const BOOKMARK_HELP_TEMPLATE: &str = r#"template-aliases.'bookmark_help()'='''
 if(normal_target,
     if(normal_target.description(),
         normal_target.description().first_line(),
-        "(no description set)",
+        "no description",
     ),
-    "(conflicted bookmark)",
+    "conflicted bookmark",
 )
 '''"#;
 

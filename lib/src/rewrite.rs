@@ -43,6 +43,7 @@ use crate::merged_tree::TreeDiffEntry;
 use crate::repo::MutableRepo;
 use crate::repo::Repo;
 use crate::repo_path::RepoPath;
+use crate::revset::ResolvedRevsetExpression;
 use crate::revset::RevsetExpression;
 use crate::revset::RevsetIteratorExt as _;
 use crate::store::Store;
@@ -252,10 +253,15 @@ impl<'repo> CommitRewriter<'repo> {
             let old_base_tree = merge_commit_trees(self.mut_repo, &old_parents)?;
             let new_base_tree = merge_commit_trees(self.mut_repo, &new_parents)?;
             let old_tree = self.old_commit.tree()?;
-            (
-                old_base_tree.id() == *self.old_commit.tree_id(),
-                new_base_tree.merge(&old_base_tree, &old_tree)?.id(),
-            )
+            let was_empty = old_base_tree.id() == *self.old_commit.tree_id();
+            let new_tree_id = if self.check_for_duplicate(&old_base_tree, &old_tree)? {
+                // If another commit with the same change ID and diff is already present in the
+                // new ancestor commits, then the commit should become empty after rebasing.
+                new_base_tree.id()
+            } else {
+                new_base_tree.merge(&old_base_tree, &old_tree)?.id()
+            };
+            (was_empty, new_tree_id)
         };
         // Ensure we don't abandon commits with multiple parents (merge commits), even
         // if they're empty.
@@ -277,6 +283,40 @@ impl<'repo> CommitRewriter<'repo> {
             .set_parents(self.new_parents)
             .set_tree_id(new_tree_id);
         Ok(Some(builder))
+    }
+
+    fn check_for_duplicate(
+        &self,
+        old_base_tree: &MergedTree,
+        old_tree: &MergedTree,
+    ) -> BackendResult<bool> {
+        let mut candidate_duplicates = self
+            .mut_repo
+            .resolve_change_id(self.old_commit.change_id())
+            .unwrap_or_default();
+        candidate_duplicates.retain(|commit| commit != self.old_commit.id());
+        if candidate_duplicates.is_empty() {
+            return Ok(false);
+        }
+
+        let candidate_duplicates = ResolvedRevsetExpression::commits(candidate_duplicates)
+            .intersection(
+                &ResolvedRevsetExpression::commit(self.old_commit.id().clone())
+                    .range(&ResolvedRevsetExpression::commits(self.new_parents.clone())),
+            )
+            .evaluate(self.mut_repo)
+            .map_err(|err| BackendError::Other(Box::new(err)))?;
+
+        for candidate_id in candidate_duplicates.iter() {
+            let candidate_id = candidate_id.map_err(|err| BackendError::Other(Box::new(err)))?;
+            let candidate = self.mut_repo.store().get_commit(&candidate_id)?;
+            let new_base_tree = candidate.parent_tree(self.mut_repo)?;
+            let new_tree = new_base_tree.merge(old_base_tree, old_tree)?;
+            if new_tree.id() == *candidate.tree_id() {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     /// Rebase the old commit onto the new parents. Returns a `CommitBuilder`

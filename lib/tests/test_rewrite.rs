@@ -30,6 +30,7 @@ use jj_lib::repo::Repo as _;
 use jj_lib::repo_path::RepoPath;
 use jj_lib::rewrite::rebase_commit_with_options;
 use jj_lib::rewrite::restore_tree;
+use jj_lib::rewrite::AbandonOptions;
 use jj_lib::rewrite::CommitRewriter;
 use jj_lib::rewrite::CommitWithSelection;
 use jj_lib::rewrite::EmptyBehaviour;
@@ -1701,7 +1702,9 @@ fn test_empty_commit_option(empty_behavior: EmptyBehaviour) {
     let rebase_map = rebase_descendants_with_options_return_map(
         tx.repo_mut(),
         &RebaseOptions {
-            empty: empty_behavior,
+            abandon: AbandonOptions {
+                empty: empty_behavior,
+            },
             rewrite_refs: RewriteRefsOptions {
                 delete_abandoned_bookmarks: false,
             },
@@ -1836,7 +1839,9 @@ fn test_rebase_abandoning_empty() {
         .unwrap();
 
     let rebase_options = RebaseOptions {
-        empty: EmptyBehaviour::AbandonAllEmpty,
+        abandon: AbandonOptions {
+            empty: EmptyBehaviour::AbandonAllEmpty,
+        },
         rewrite_refs: RewriteRefsOptions {
             delete_abandoned_bookmarks: false,
         },

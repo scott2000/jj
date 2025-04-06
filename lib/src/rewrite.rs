@@ -220,9 +220,9 @@ impl<'repo> CommitRewriter<'repo> {
 
     /// Rebase the old commit onto the new parents. Returns a `CommitBuilder`
     /// for the new commit. Returns `None` if the commit was abandoned.
-    pub fn rebase_with_empty_behavior(
+    pub fn rebase_with_abandon_options(
         self,
-        empty: EmptyBehaviour,
+        abandon: &AbandonOptions,
     ) -> BackendResult<Option<CommitBuilder<'repo>>> {
         let old_parents: Vec<_> = self.old_commit.parents().try_collect()?;
         let old_parent_trees = old_parents
@@ -259,7 +259,7 @@ impl<'repo> CommitRewriter<'repo> {
         // Ensure we don't abandon commits with multiple parents (merge commits), even
         // if they're empty.
         if let [parent] = &new_parents[..] {
-            let should_abandon = match empty {
+            let should_abandon = match abandon.empty {
                 EmptyBehaviour::Keep => false,
                 EmptyBehaviour::AbandonNewlyEmpty => *parent.tree_id() == new_tree_id && !was_empty,
                 EmptyBehaviour::AbandonAllEmpty => *parent.tree_id() == new_tree_id,
@@ -281,7 +281,7 @@ impl<'repo> CommitRewriter<'repo> {
     /// Rebase the old commit onto the new parents. Returns a `CommitBuilder`
     /// for the new commit.
     pub fn rebase(self) -> BackendResult<CommitBuilder<'repo>> {
-        let builder = self.rebase_with_empty_behavior(EmptyBehaviour::Keep)?;
+        let builder = self.rebase_with_abandon_options(&AbandonOptions::keep_all())?;
         Ok(builder.unwrap())
     }
 
@@ -317,7 +317,7 @@ pub fn rebase_commit_with_options(
         _ => None,
     };
     let new_parents_len = rewriter.new_parents.len();
-    if let Some(builder) = rewriter.rebase_with_empty_behavior(options.empty)? {
+    if let Some(builder) = rewriter.rebase_with_abandon_options(&options.abandon)? {
         let new_commit = builder.write()?;
         Ok(RebasedCommit::Rewritten(new_commit))
     } else {
@@ -372,11 +372,24 @@ pub enum EmptyBehaviour {
 // plumb it in.
 #[derive(Clone, Debug, Default)]
 pub struct RebaseOptions {
-    pub empty: EmptyBehaviour,
+    pub abandon: AbandonOptions,
     pub rewrite_refs: RewriteRefsOptions,
     /// If a merge commit would end up with one parent being an ancestor of the
     /// other, then filter out the ancestor.
     pub simplify_ancestor_merge: bool,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct AbandonOptions {
+    pub empty: EmptyBehaviour,
+}
+
+impl AbandonOptions {
+    pub fn keep_all() -> Self {
+        AbandonOptions {
+            empty: EmptyBehaviour::Keep,
+        }
+    }
 }
 
 /// Configuration for [`MutableRepo::update_rewritten_references()`].
@@ -708,7 +721,7 @@ pub fn move_commits(
 
     // Always keep empty commits when rebasing descendants.
     let rebase_descendant_options = &RebaseOptions {
-        empty: EmptyBehaviour::Keep,
+        abandon: AbandonOptions::keep_all(),
         rewrite_refs: options.rewrite_refs.clone(),
         simplify_ancestor_merge: options.simplify_ancestor_merge,
     };

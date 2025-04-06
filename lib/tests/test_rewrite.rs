@@ -33,6 +33,7 @@ use jj_lib::rewrite::restore_tree;
 use jj_lib::rewrite::AbandonOptions;
 use jj_lib::rewrite::CommitRewriter;
 use jj_lib::rewrite::CommitWithSelection;
+use jj_lib::rewrite::DivergentBehaviour;
 use jj_lib::rewrite::EmptyBehaviour;
 use jj_lib::rewrite::RebaseOptions;
 use jj_lib::rewrite::RewriteRefsOptions;
@@ -1704,6 +1705,7 @@ fn test_empty_commit_option(empty_behavior: EmptyBehaviour) {
         &RebaseOptions {
             abandon: AbandonOptions {
                 empty: empty_behavior,
+                divergent: DivergentBehaviour::Keep,
             },
             rewrite_refs: RewriteRefsOptions {
                 delete_abandoned_bookmarks: false,
@@ -1841,6 +1843,7 @@ fn test_rebase_abandoning_empty() {
     let rebase_options = RebaseOptions {
         abandon: AbandonOptions {
             empty: EmptyBehaviour::AbandonAllEmpty,
+            divergent: DivergentBehaviour::Keep,
         },
         rewrite_refs: RewriteRefsOptions {
             delete_abandoned_bookmarks: false,

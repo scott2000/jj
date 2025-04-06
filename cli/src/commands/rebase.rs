@@ -28,6 +28,7 @@ use jj_lib::revset::RevsetExpression;
 use jj_lib::revset::RevsetIteratorExt as _;
 use jj_lib::rewrite::move_commits;
 use jj_lib::rewrite::AbandonOptions;
+use jj_lib::rewrite::DivergentBehaviour;
 use jj_lib::rewrite::EmptyBehaviour;
 use jj_lib::rewrite::MoveCommitsStats;
 use jj_lib::rewrite::MoveCommitsTarget;
@@ -382,6 +383,7 @@ pub(crate) fn cmd_rebase(
                 true => EmptyBehaviour::AbandonNewlyEmpty,
                 false => EmptyBehaviour::Keep,
             },
+            divergent: DivergentBehaviour::Keep,
         },
         rewrite_refs: RewriteRefsOptions {
             delete_abandoned_bookmarks: false,

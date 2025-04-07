@@ -327,6 +327,14 @@ pub(crate) struct RebaseArgs {
     /// parents.
     #[arg(long)]
     skip_emptied: bool,
+
+    /// Keep divergent commits from being skipped while rebasing
+    ///
+    /// Without this flag, divergent commits are abandoned when they are rebased
+    /// to become descendents of another commit with the same change ID if both
+    /// commits contain the same changes.
+    #[arg(long)]
+    keep_divergent: bool,
 }
 
 #[derive(clap::Args, Clone, Debug)]
@@ -383,7 +391,10 @@ pub(crate) fn cmd_rebase(
                 true => EmptyBehaviour::AbandonNewlyEmpty,
                 false => EmptyBehaviour::Keep,
             },
-            divergent: DivergentBehaviour::Keep,
+            divergent: match args.keep_divergent {
+                true => DivergentBehaviour::Keep,
+                false => DivergentBehaviour::AbandonIdenticalDuplicates,
+            },
         },
         rewrite_refs: RewriteRefsOptions {
             delete_abandoned_bookmarks: false,
@@ -679,6 +690,7 @@ fn print_move_commits_stats(ui: &Ui, stats: &MoveCommitsStats) -> std::io::Resul
         )?;
     }
     if num_abandoned > 0 {
+        // TODO: add better message for divergent commits?
         writeln!(formatter, "Abandoned {num_abandoned} newly emptied commits")?;
     }
     Ok(())

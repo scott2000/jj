@@ -1508,6 +1508,34 @@ where
     Ok(expression)
 }
 
+/// Flatten all intersections to be left-recursive. For instance, transforms
+/// `(a & b) & (c & d)` into `((a & b) & c) & d`.
+fn flatten_intersections<St: ExpressionState>(
+    expression: &Rc<RevsetExpression<St>>,
+) -> TransformedExpression<St> {
+    fn flatten<St: ExpressionState>(
+        expression1: &Rc<RevsetExpression<St>>,
+        expression2: &Rc<RevsetExpression<St>>,
+    ) -> TransformedExpression<St> {
+        match expression2.as_ref() {
+            // flatten(a & (b & c)) -> flatten(a & b) & c
+            RevsetExpression::Intersection(inner1, inner2) => Some(
+                flatten(expression1, inner1)
+                    .unwrap_or_else(|| expression1.intersection(inner1))
+                    .intersection(inner2),
+            ),
+            _ => None,
+        }
+    }
+
+    transform_expression_bottom_up(expression, |expression| match expression.as_ref() {
+        RevsetExpression::Intersection(expression1, expression2) => {
+            flatten(expression1, expression2)
+        }
+        _ => None,
+    })
+}
+
 /// Transforms filter expressions, by applying the following rules.
 ///
 /// a. Moves as many sets to left of filter intersection as possible, to
@@ -1543,9 +1571,7 @@ fn internalize_filter<St: ExpressionState>(
     }
 
     // Since both sides must have already been intersect_down()-ed, we don't need to
-    // apply the whole bottom-up pass to new intersection node. Instead, just push
-    // new 'c & (d & g)' down-left to '(c & d) & g' while either side is
-    // an intersection of filter node.
+    // apply the whole bottom-up pass to new intersection node.
     fn intersect_down<St: ExpressionState>(
         expression1: &Rc<RevsetExpression<St>>,
         expression2: &Rc<RevsetExpression<St>>,
@@ -1556,14 +1582,13 @@ fn internalize_filter<St: ExpressionState>(
             (_, e2) if is_filter(e2) => None,
             // f1 & e2 -> e2 & f1
             (e1, _) if is_filter(e1) => Some(expression2.intersection(expression1)),
-            (e1, e2) => match (as_filter_intersection(e1), as_filter_intersection(e2)) {
-                // e1 & (c2 & f2) -> (e1 & c2) & f2
-                // (c1 & f1) & (c2 & f2) -> ((c1 & f1) & c2) & f2 -> ((c1 & c2) & f1) & f2
-                (_, Some((c2, f2))) => Some(recurse(expression1, c2).intersection(f2)),
+            // Intersections have already been flattened, so we know that the right subtree cannot
+            // be an intersection.
+            (e1, _) => match as_filter_intersection(e1) {
                 // (c1 & f1) & e2 -> (c1 & e2) & f1
                 // ((c1 & f1) & g1) & e2 -> ((c1 & f1) & e2) & g1 -> ((c1 & e2) & f1) & g1
-                (Some((c1, f1)), _) => Some(recurse(c1, expression2).intersection(f1)),
-                (None, None) => None,
+                Some((c1, f1)) => Some(recurse(c1, expression2).intersection(f1)),
+                None => None,
             },
         }
     }
@@ -1646,6 +1671,10 @@ fn to_difference_range<St: ExpressionState>(
             heads: heads.clone(),
             generation: generation.clone(),
         })),
+        // (a & ::heads) & ~::roots -> a & roots..heads
+        (RevsetExpression::Intersection(inner1, inner2), _) => {
+            to_difference_range(inner2, complement).map(|range| inner1.intersection(&range))
+        }
         _ => None,
     }
 }
@@ -1672,6 +1701,11 @@ fn fold_difference<St: ExpressionState>(
                 }
                 (RevsetExpression::NotIn(complement), _) => {
                     Some(to_difference(expression2, complement))
+                }
+                // (a ~ ::b) & ::c -> a & b..c
+                (RevsetExpression::Difference(inner, complement), _) => {
+                    to_difference_range(expression2, complement)
+                        .map(|range| inner.intersection(&range))
                 }
                 _ => None,
             }
@@ -1791,6 +1825,7 @@ pub fn optimize<St: ExpressionState>(
 ) -> Rc<RevsetExpression<St>> {
     let expression = unfold_difference(&expression).unwrap_or(expression);
     let expression = fold_redundant_expression(&expression).unwrap_or(expression);
+    let expression = flatten_intersections(&expression).unwrap_or(expression);
     let expression = fold_generation(&expression).unwrap_or(expression);
     let expression = internalize_filter(&expression).unwrap_or(expression);
     let expression = fold_difference(&expression).unwrap_or(expression);
@@ -3721,6 +3756,67 @@ mod tests {
             CommitRef(Symbol("bar")),
         )
         "#);
+
+        // Negated ancestors are combined into differences when possible.
+        insta::assert_debug_snapshot!(optimize(parse("roots(a) ~ ::c ~ ::d").unwrap()), @r#"
+        Difference(
+            Difference(
+                Roots(CommitRef(Symbol("a"))),
+                Ancestors {
+                    heads: CommitRef(Symbol("c")),
+                    generation: 0..18446744073709551615,
+                },
+            ),
+            Ancestors {
+                heads: CommitRef(Symbol("d")),
+                generation: 0..18446744073709551615,
+            },
+        )
+        "#);
+        insta::assert_debug_snapshot!(optimize(parse("~a & roots(b) & ~::c").unwrap()), @r#"
+        Difference(
+            Difference(
+                Roots(CommitRef(Symbol("b"))),
+                CommitRef(Symbol("a")),
+            ),
+            Ancestors {
+                heads: CommitRef(Symbol("c")),
+                generation: 0..18446744073709551615,
+            },
+        )
+        "#);
+
+        // Multiple ranges can be folded after being unfolded initially.
+        insta::assert_debug_snapshot!(optimize(parse("a..b & c..d").unwrap()), @r#"
+        Intersection(
+            Range {
+                roots: CommitRef(Symbol("a")),
+                heads: CommitRef(Symbol("b")),
+                generation: 0..18446744073709551615,
+            },
+            Range {
+                roots: CommitRef(Symbol("c")),
+                heads: CommitRef(Symbol("d")),
+                generation: 0..18446744073709551615,
+            },
+        )
+        "#);
+
+        // Ranges can be combined regardless of intersection grouping order.
+        insta::assert_debug_snapshot!(optimize(parse("~::a & (::b & ::c) ~ ::d").unwrap()), @r#"
+        Intersection(
+            Range {
+                roots: CommitRef(Symbol("a")),
+                heads: CommitRef(Symbol("b")),
+                generation: 0..18446744073709551615,
+            },
+            Range {
+                roots: CommitRef(Symbol("d")),
+                heads: CommitRef(Symbol("c")),
+                generation: 0..18446744073709551615,
+            },
+        )
+        "#);
     }
 
     #[test]
@@ -3995,11 +4091,11 @@ mod tests {
                 Intersection(
                     Intersection(
                         Intersection(
-                            CommitRef(Symbol("a")),
                             Intersection(
+                                CommitRef(Symbol("a")),
                                 CommitRef(Symbol("b")),
-                                CommitRef(Symbol("c")),
                             ),
+                            CommitRef(Symbol("c")),
                         ),
                         CommitRef(Symbol("d")),
                     ),

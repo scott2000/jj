@@ -1536,6 +1536,52 @@ fn flatten_intersections<St: ExpressionState>(
     })
 }
 
+/// Push `ancestors(x)` and `~ancestors(x)` down (to the left) in intersections.
+fn push_ancestors_down<St: ExpressionState>(
+    expression: &Rc<RevsetExpression<St>>,
+) -> TransformedExpression<St> {
+    fn is_ancestors<St: ExpressionState>(expression: &RevsetExpression<St>) -> bool {
+        match expression {
+            RevsetExpression::Ancestors { .. } => true,
+            RevsetExpression::NotIn(complement) => {
+                matches!(complement.as_ref(), RevsetExpression::Ancestors { .. })
+            }
+            _ => false,
+        }
+    }
+
+    fn should_swap<St: ExpressionState>(
+        expression1: &Rc<RevsetExpression<St>>,
+        expression2: &Rc<RevsetExpression<St>>,
+    ) -> bool {
+        !is_ancestors(expression1) && is_ancestors(expression2)
+    }
+
+    fn intersect_ancestors_down<St: ExpressionState>(
+        expression1: &Rc<RevsetExpression<St>>,
+        expression2: &Rc<RevsetExpression<St>>,
+    ) -> TransformedExpression<St> {
+        if let RevsetExpression::Intersection(inner1, inner2) = expression1.as_ref() {
+            // (a & b) & ::c -> (a & ::c) & b
+            should_swap(inner2, expression2).then(|| {
+                intersect_ancestors_down(inner1, expression2)
+                    .unwrap_or_else(|| inner1.intersection(expression2))
+                    .intersection(inner2)
+            })
+        } else {
+            // a & ::b -> ::b & a
+            should_swap(expression1, expression2).then(|| expression2.intersection(expression1))
+        }
+    }
+
+    transform_expression_bottom_up(expression, |expression| match expression.as_ref() {
+        RevsetExpression::Intersection(expression1, expression2) => {
+            intersect_ancestors_down(expression1, expression2)
+        }
+        _ => None,
+    })
+}
+
 /// Transforms filter expressions, by applying the following rules.
 ///
 /// a. Moves as many sets to left of filter intersection as possible, to
@@ -1826,6 +1872,7 @@ pub fn optimize<St: ExpressionState>(
     let expression = unfold_difference(&expression).unwrap_or(expression);
     let expression = fold_redundant_expression(&expression).unwrap_or(expression);
     let expression = flatten_intersections(&expression).unwrap_or(expression);
+    let expression = push_ancestors_down(&expression).unwrap_or(expression);
     let expression = fold_generation(&expression).unwrap_or(expression);
     let expression = internalize_filter(&expression).unwrap_or(expression);
     let expression = fold_difference(&expression).unwrap_or(expression);
@@ -3757,32 +3804,35 @@ mod tests {
         )
         "#);
 
-        // Negated ancestors are combined into differences when possible.
+        // TODO: We shouldn't need a range with `visible_heads()`, since it was
+        // originally a difference.
         insta::assert_debug_snapshot!(optimize(parse("roots(a) ~ ::c ~ ::d").unwrap()), @r#"
-        Difference(
+        Intersection(
             Difference(
-                Roots(CommitRef(Symbol("a"))),
+                Range {
+                    roots: CommitRef(Symbol("c")),
+                    heads: VisibleHeads,
+                    generation: 0..18446744073709551615,
+                },
                 Ancestors {
-                    heads: CommitRef(Symbol("c")),
+                    heads: CommitRef(Symbol("d")),
                     generation: 0..18446744073709551615,
                 },
             ),
-            Ancestors {
-                heads: CommitRef(Symbol("d")),
-                generation: 0..18446744073709551615,
-            },
+            Roots(CommitRef(Symbol("a"))),
         )
         "#);
         insta::assert_debug_snapshot!(optimize(parse("~a & roots(b) & ~::c").unwrap()), @r#"
-        Difference(
+        Intersection(
             Difference(
-                Roots(CommitRef(Symbol("b"))),
+                Range {
+                    roots: CommitRef(Symbol("c")),
+                    heads: VisibleHeads,
+                    generation: 0..18446744073709551615,
+                },
                 CommitRef(Symbol("a")),
             ),
-            Ancestors {
-                heads: CommitRef(Symbol("c")),
-                generation: 0..18446744073709551615,
-            },
+            Roots(CommitRef(Symbol("b"))),
         )
         "#);
 
@@ -3802,19 +3852,29 @@ mod tests {
         )
         "#);
 
-        // Ranges can be combined regardless of intersection grouping order.
-        insta::assert_debug_snapshot!(optimize(parse("~::a & (::b & ::c) ~ ::d").unwrap()), @r#"
+        // Ranges can be combined regardless of intersection grouping order and
+        // intervening expressions.
+        insta::assert_debug_snapshot!(optimize(parse("foo ~ ::a & (::b & bar & ::c) & (baz ~ ::d)").unwrap()), @r#"
         Intersection(
-            Range {
-                roots: CommitRef(Symbol("a")),
-                heads: CommitRef(Symbol("b")),
-                generation: 0..18446744073709551615,
-            },
-            Range {
-                roots: CommitRef(Symbol("d")),
-                heads: CommitRef(Symbol("c")),
-                generation: 0..18446744073709551615,
-            },
+            Intersection(
+                Intersection(
+                    Intersection(
+                        Range {
+                            roots: CommitRef(Symbol("a")),
+                            heads: CommitRef(Symbol("b")),
+                            generation: 0..18446744073709551615,
+                        },
+                        Range {
+                            roots: CommitRef(Symbol("d")),
+                            heads: CommitRef(Symbol("c")),
+                            generation: 0..18446744073709551615,
+                        },
+                    ),
+                    CommitRef(Symbol("foo")),
+                ),
+                CommitRef(Symbol("bar")),
+            ),
+            CommitRef(Symbol("baz")),
         )
         "#);
     }
@@ -4033,11 +4093,11 @@ mod tests {
         Intersection(
             Intersection(
                 Intersection(
-                    CommitRef(Symbol("foo")),
                     Ancestors {
                         heads: Filter(AuthorName(Substring("baz"))),
                         generation: 1..2,
                     },
+                    CommitRef(Symbol("foo")),
                 ),
                 CommitRef(Symbol("qux")),
             ),
@@ -4049,7 +4109,6 @@ mod tests {
             @r#"
         Intersection(
             Intersection(
-                CommitRef(Symbol("foo")),
                 Ancestors {
                     heads: Intersection(
                         CommitRef(Symbol("qux")),
@@ -4057,6 +4116,7 @@ mod tests {
                     ),
                     generation: 1..2,
                 },
+                CommitRef(Symbol("foo")),
             ),
             Filter(Description(Substring("bar"))),
         )

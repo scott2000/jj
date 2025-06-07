@@ -1717,6 +1717,23 @@ fn to_difference_range<St: ExpressionState>(
             heads: heads.clone(),
             generation: generation.clone(),
         })),
+        (RevsetExpression::NotIn(expression_complement), _) => {
+            match (expression_complement.as_ref(), complement.as_ref()) {
+                // ~::x & ~::y -> ~::(x | y)
+                (
+                    RevsetExpression::Ancestors {
+                        heads: roots1,
+                        generation: g1,
+                    },
+                    RevsetExpression::Ancestors {
+                        heads: roots2,
+                        generation: g2,
+                    },
+                ) if g1 == g2 => Some(roots1.union(roots2).ancestors_range(g1.clone()).negated()),
+                // ~x & ~y -> ~(x | y)
+                _ => Some(expression_complement.union(complement).negated()),
+            }
+        }
         // (a & ::heads) & ~::roots -> a & roots..heads
         (RevsetExpression::Intersection(inner1, inner2), _) => {
             to_difference_range(inner2, complement).map(|range| inner1.intersection(&range))
@@ -3798,41 +3815,38 @@ mod tests {
 
         // Should be better than '(all() & ~foo) & (all() & ~bar)'.
         insta::assert_debug_snapshot!(optimize(parse("~foo & ~bar").unwrap()), @r#"
-        Difference(
-            NotIn(CommitRef(Symbol("foo"))),
-            CommitRef(Symbol("bar")),
+        NotIn(
+            Union(
+                CommitRef(Symbol("foo")),
+                CommitRef(Symbol("bar")),
+            ),
         )
         "#);
 
-        // TODO: We shouldn't need a range with `visible_heads()`, since it was
-        // originally a difference.
+        // Negated ancestors are pushed to the left during optimization, but they should
+        // be combined into a single difference when possible.
         insta::assert_debug_snapshot!(optimize(parse("roots(a) ~ ::c ~ ::d").unwrap()), @r#"
-        Intersection(
-            Difference(
-                Range {
-                    roots: CommitRef(Symbol("c")),
-                    heads: VisibleHeads,
-                    generation: 0..18446744073709551615,
-                },
-                Ancestors {
-                    heads: CommitRef(Symbol("d")),
-                    generation: 0..18446744073709551615,
-                },
-            ),
+        Difference(
             Roots(CommitRef(Symbol("a"))),
+            Ancestors {
+                heads: Union(
+                    CommitRef(Symbol("c")),
+                    CommitRef(Symbol("d")),
+                ),
+                generation: 0..18446744073709551615,
+            },
         )
         "#);
         insta::assert_debug_snapshot!(optimize(parse("~a & roots(b) & ~::c").unwrap()), @r#"
-        Intersection(
-            Difference(
-                Range {
-                    roots: CommitRef(Symbol("c")),
-                    heads: VisibleHeads,
+        Difference(
+            Roots(CommitRef(Symbol("b"))),
+            Union(
+                Ancestors {
+                    heads: CommitRef(Symbol("c")),
                     generation: 0..18446744073709551615,
                 },
                 CommitRef(Symbol("a")),
             ),
-            Roots(CommitRef(Symbol("b"))),
         )
         "#);
 

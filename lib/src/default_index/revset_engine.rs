@@ -69,8 +69,21 @@ use crate::store::Store;
 use crate::str_util::StringPattern;
 use crate::union_find;
 
-type BoxedPredicateFn<'a> =
-    Box<dyn FnMut(&CompositeIndex, IndexPosition) -> Result<bool, RevsetEvaluationError> + 'a>;
+#[derive(Clone, Copy)]
+enum PredicateResult {
+    /// Commit doesn't match predicate.
+    NoMatch,
+    /// Commit matches predicate.
+    Match,
+    /// Commit doesn't match predicate, and no further commits will match
+    /// either.
+    Done,
+}
+
+type BoxedPredicateFn<'a> = Box<
+    dyn FnMut(&CompositeIndex, IndexPosition) -> Result<PredicateResult, RevsetEvaluationError>
+        + 'a,
+>;
 pub(super) type BoxedRevWalk<'a> =
     Box<dyn RevWalk<CompositeIndex, Item = Result<IndexPosition, RevsetEvaluationError>> + 'a>;
 
@@ -380,7 +393,13 @@ where
         while walk.next_if(index, |&pos| pos > entry_pos).is_some() {
             continue;
         }
-        Ok(walk.next_if(index, |&pos| pos == entry_pos).is_some())
+        if walk.next_if(index, |&pos| pos == entry_pos).is_some() {
+            Ok(PredicateResult::Match)
+        } else if walk.peek(index).is_some() {
+            Ok(PredicateResult::NoMatch)
+        } else {
+            Ok(PredicateResult::Done)
+        }
     })
 }
 

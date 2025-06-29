@@ -29,6 +29,7 @@ use super::entry::IndexPosition;
 use super::entry::SmallIndexPositionsVec;
 use super::rev_walk_queue::RevWalkQueue;
 use super::rev_walk_queue::RevWalkWorkItem;
+use crate::revset::PARENTS_RANGE_FULL;
 
 /// Like `Iterator`, but doesn't borrow the `index` internally.
 pub(super) trait RevWalk<I: ?Sized> {
@@ -247,6 +248,17 @@ pub(super) trait RevWalkIndex {
     type AdjacentPositions: IntoIterator<Item = Self::Position>;
 
     fn adjacent_positions(&self, pos: Self::Position) -> Self::AdjacentPositions;
+
+    fn adjacent_positions_in_range(
+        &self,
+        pos: Self::Position,
+        parents_range: &Range<u32>,
+    ) -> impl IntoIterator<Item = Self::Position> {
+        self.adjacent_positions(pos)
+            .into_iter()
+            .skip(parents_range.start as usize)
+            .take(parents_range.end.saturating_sub(parents_range.start) as usize)
+    }
 }
 
 impl RevWalkIndex for CompositeIndex {
@@ -325,11 +337,15 @@ impl<'a> RevWalkBuilder<'a> {
     }
 
     /// Walks ancestors.
-    pub fn ancestors(self) -> RevWalkAncestors<'a> {
-        self.ancestors_with_min_pos(IndexPosition::MIN)
+    pub fn ancestors(self, wanted_parents_range: Range<u32>) -> RevWalkAncestors<'a> {
+        self.ancestors_with_min_pos(IndexPosition::MIN, wanted_parents_range)
     }
 
-    fn ancestors_with_min_pos(self, min_pos: IndexPosition) -> RevWalkAncestors<'a> {
+    fn ancestors_with_min_pos(
+        self,
+        min_pos: IndexPosition,
+        wanted_parents_range: Range<u32>,
+    ) -> RevWalkAncestors<'a> {
         let index = self.index;
         let mut wanted_queue = RevWalkQueue::with_min_pos(min_pos);
         let mut unwanted_queue = RevWalkQueue::with_min_pos(min_pos);
@@ -340,6 +356,7 @@ impl<'a> RevWalkBuilder<'a> {
             walk: RevWalkImpl {
                 wanted_queue,
                 unwanted_queue,
+                wanted_parents_range,
             },
         }
     }
@@ -350,6 +367,7 @@ impl<'a> RevWalkBuilder<'a> {
     pub fn ancestors_filtered_by_generation(
         self,
         generation_range: Range<u32>,
+        wanted_parents_range: Range<u32>,
     ) -> RevWalkAncestorsGenerationRange<'a> {
         let index = self.index;
         let mut wanted_queue = RevWalkQueue::with_min_pos(IndexPosition::MIN);
@@ -362,6 +380,7 @@ impl<'a> RevWalkBuilder<'a> {
             walk: RevWalkGenerationRangeImpl {
                 wanted_queue,
                 unwanted_queue,
+                wanted_parents_range,
                 generation_end: generation_range.end,
             },
         }
@@ -383,7 +402,7 @@ impl<'a> RevWalkBuilder<'a> {
             .into_iter()
             .min()
             .unwrap_or(IndexPosition::MAX);
-        self.ancestors_with_min_pos(min_pos)
+        self.ancestors_with_min_pos(min_pos, PARENTS_RANGE_FULL)
     }
 
     /// Fully consumes ancestors and walks back from the `root_positions`.
@@ -435,6 +454,7 @@ impl<'a> RevWalkBuilder<'a> {
             walk: RevWalkGenerationRangeImpl {
                 wanted_queue,
                 unwanted_queue,
+                wanted_parents_range: PARENTS_RANGE_FULL,
                 generation_end: generation_range.end,
             },
         }
@@ -449,6 +469,7 @@ pub(super) type RevWalkAncestors<'a> =
 pub(super) struct RevWalkImpl<P> {
     wanted_queue: RevWalkQueue<P, ()>,
     unwanted_queue: RevWalkQueue<P, ()>,
+    wanted_parents_range: Range<u32>,
 }
 
 impl<I: RevWalkIndex + ?Sized> RevWalk<I> for RevWalkImpl<I::Position> {
@@ -460,8 +481,10 @@ impl<I: RevWalkIndex + ?Sized> RevWalk<I> for RevWalkImpl<I::Position> {
             if flush_queue_until(&mut self.unwanted_queue, index, item.pos).is_some() {
                 continue;
             }
-            self.wanted_queue
-                .extend(index.adjacent_positions(item.pos), ());
+            self.wanted_queue.extend(
+                index.adjacent_positions_in_range(item.pos, &self.wanted_parents_range),
+                (),
+            );
             return Some(item.pos);
         }
         None
@@ -481,6 +504,7 @@ pub(super) struct RevWalkGenerationRangeImpl<P> {
     // Sort item generations in ascending order
     wanted_queue: RevWalkQueue<P, Reverse<RevWalkItemGenerationRange>>,
     unwanted_queue: RevWalkQueue<P, ()>,
+    wanted_parents_range: Range<u32>,
     generation_end: u32,
 }
 
@@ -497,8 +521,10 @@ impl<P: Ord> RevWalkGenerationRangeImpl<P> {
             start: gen.start + 1,
             end: gen.end.saturating_add(1),
         };
-        self.wanted_queue
-            .extend(index.adjacent_positions(pos), Reverse(succ_gen));
+        self.wanted_queue.extend(
+            index.adjacent_positions_in_range(pos, &self.wanted_parents_range),
+            Reverse(succ_gen),
+        );
     }
 }
 
@@ -813,7 +839,7 @@ mod tests {
             RevWalkBuilder::new(index)
                 .wanted_heads(to_positions_vec(index, wanted))
                 .unwanted_roots(to_positions_vec(index, unwanted))
-                .ancestors()
+                .ancestors(PARENTS_RANGE_FULL)
                 .map(|pos| index.entry_by_pos(pos).commit_id())
                 .collect_vec()
         };
@@ -962,7 +988,7 @@ mod tests {
             RevWalkBuilder::new(index)
                 .wanted_heads(to_positions_vec(index, wanted))
                 .unwanted_roots(to_positions_vec(index, unwanted))
-                .ancestors_filtered_by_generation(range)
+                .ancestors_filtered_by_generation(range, PARENTS_RANGE_FULL)
                 .map(|pos| index.entry_by_pos(pos).commit_id())
                 .collect_vec()
         };
@@ -1039,7 +1065,7 @@ mod tests {
             let index = index.as_composite();
             RevWalkBuilder::new(index)
                 .wanted_heads(to_positions_vec(index, wanted))
-                .ancestors_filtered_by_generation(range)
+                .ancestors_filtered_by_generation(range, PARENTS_RANGE_FULL)
                 .map(|pos| index.entry_by_pos(pos).commit_id())
                 .collect_vec()
         };

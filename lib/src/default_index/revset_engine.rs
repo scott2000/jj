@@ -64,6 +64,7 @@ use crate::revset::RevsetContainingFn;
 use crate::revset::RevsetEvaluationError;
 use crate::revset::RevsetFilterPredicate;
 use crate::revset::GENERATION_RANGE_FULL;
+use crate::revset::PARENTS_RANGE_FULL;
 use crate::rewrite;
 use crate::store::Store;
 use crate::str_util::StringPattern;
@@ -809,12 +810,12 @@ impl EvaluationContext<'_> {
                 let builder =
                     RevWalkBuilder::new(index).wanted_heads(head_positions.try_collect()?);
                 if generation == &GENERATION_RANGE_FULL {
-                    let walk = builder.ancestors().detach();
+                    let walk = builder.ancestors(PARENTS_RANGE_FULL).detach();
                     Ok(Box::new(RevWalkRevset { walk }))
                 } else {
                     let generation = to_u32_generation_range(generation)?;
                     let walk = builder
-                        .ancestors_filtered_by_generation(generation)
+                        .ancestors_filtered_by_generation(generation, PARENTS_RANGE_FULL)
                         .detach();
                     Ok(Box::new(RevWalkRevset { walk }))
                 }
@@ -840,12 +841,12 @@ impl EvaluationContext<'_> {
                     .wanted_heads(head_positions.try_collect()?)
                     .unwanted_roots(root_positions);
                 if generation == &GENERATION_RANGE_FULL {
-                    let walk = builder.ancestors().detach();
+                    let walk = builder.ancestors(PARENTS_RANGE_FULL).detach();
                     Ok(Box::new(RevWalkRevset { walk }))
                 } else {
                     let generation = to_u32_generation_range(generation)?;
                     let walk = builder
-                        .ancestors_filtered_by_generation(generation)
+                        .ancestors_filtered_by_generation(generation, PARENTS_RANGE_FULL)
                         .detach();
                     Ok(Box::new(RevWalkRevset { walk }))
                 }

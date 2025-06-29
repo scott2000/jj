@@ -445,6 +445,31 @@ impl<St: ExpressionState> RevsetExpression<St> {
         })
     }
 
+    /// First parent of `self`.
+    pub fn first_parent(self: &Rc<Self>) -> Rc<Self> {
+        self.first_ancestors_at(1)
+    }
+
+    /// First-parent ancestors of `self`, including `self`.
+    pub fn first_ancestors(self: &Rc<Self>) -> Rc<Self> {
+        self.first_ancestors_range(GENERATION_RANGE_FULL)
+    }
+
+    /// First-parent ancestors of `self` at an offset of `generation` behind
+    /// `self`. The `generation` offset is zero-based starting from `self`.
+    pub fn first_ancestors_at(self: &Rc<Self>, generation: u64) -> Rc<Self> {
+        self.first_ancestors_range(generation..generation.saturating_add(1))
+    }
+
+    /// First-parent ancestors of `self` in the given range.
+    pub fn first_ancestors_range(self: &Rc<Self>, generation_range: Range<u64>) -> Rc<Self> {
+        Rc::new(Self::Ancestors {
+            heads: self.clone(),
+            generation: generation_range,
+            parents_range: 0..1,
+        })
+    }
+
     /// Children of `self`.
     pub fn children(self: &Rc<Self>) -> Rc<Self> {
         self.descendants_at(1)
@@ -701,6 +726,16 @@ static BUILTIN_FUNCTION_MAP: Lazy<HashMap<&'static str, RevsetFunction>> = Lazy:
             Ok(expression.parents())
         }
     });
+    map.insert("first_parent", |diagnostics, function, context| {
+        let ([arg], [depth_opt_arg]) = function.expect_arguments()?;
+        let expression = lower_expression(diagnostics, arg, context)?;
+        if let Some(depth_arg) = depth_opt_arg {
+            let depth = expect_literal("integer", depth_arg)?;
+            Ok(expression.first_ancestors_at(depth))
+        } else {
+            Ok(expression.first_parent())
+        }
+    });
     map.insert("children", |diagnostics, function, context| {
         let ([arg], [depth_opt_arg]) = function.expect_arguments()?;
         let expression = lower_expression(diagnostics, arg, context)?;
@@ -721,6 +756,17 @@ static BUILTIN_FUNCTION_MAP: Lazy<HashMap<&'static str, RevsetFunction>> = Lazy:
             GENERATION_RANGE_FULL
         };
         Ok(heads.ancestors_range(generation))
+    });
+    map.insert("first_ancestors", |diagnostics, function, context| {
+        let ([heads_arg], [depth_opt_arg]) = function.expect_arguments()?;
+        let heads = lower_expression(diagnostics, heads_arg, context)?;
+        let generation = if let Some(depth_arg) = depth_opt_arg {
+            let depth = expect_literal("integer", depth_arg)?;
+            0..depth
+        } else {
+            GENERATION_RANGE_FULL
+        };
+        Ok(heads.first_ancestors_range(generation))
     });
     map.insert("descendants", |diagnostics, function, context| {
         let ([roots_arg], [depth_opt_arg]) = function.expect_arguments()?;

@@ -40,6 +40,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `depth` argument. For instance, `parents(x, 3)` is equivalent to `x---`, and
   `children(x, 3)` is equivalent to `x+++`.
 
+* New `first_parent()` and `first_ancestors()` revset functions that restrict
+  `parents()` and `ancestors()` to only follow the first parent (similar to
+  Git's `--first-parent` option).
+
 ### Fixed bugs
 
 * `jj file annotate` can now process files at a hidden revision.

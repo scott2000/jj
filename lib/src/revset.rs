@@ -2425,6 +2425,31 @@ fn fold_generation<St: ExpressionState>(
             })),
             _ => None,
         },
+        // We can limit the number of candidates for `Roots` by ensuring that any `Descendants` or
+        // `DagRange` expressions only return at most one generation from the roots.
+        RevsetExpression::Roots(candidates) => match candidates.as_ref() {
+            // roots(x::) -> roots(descendants(x, ..)) -> roots(descendants(x, 0..1))
+            // roots((x+)::) -> roots(descendants(x, 1..)) -> roots(descendants(x, 1..2)
+            RevsetExpression::Descendants {
+                roots,
+                generation: Range { start, end },
+            } if start < end => Some(roots.descendants_range((*start)..(start + 1)).roots()),
+            // roots(x::y) -> roots(dag_range(x, y, ..)) -> roots(dag_range(x, y, 0..1))
+            // roots((x+)::y) -> roots(dag_range(x, y, 1..)) -> roots(dag_range(x, y, 1..2))
+            RevsetExpression::DagRange {
+                roots,
+                heads,
+                generation_from_roots: Range { start, end },
+            } if start < end => Some(
+                Rc::new(RevsetExpression::DagRange {
+                    roots: roots.clone(),
+                    heads: heads.clone(),
+                    generation_from_roots: (*start)..(start + 1),
+                })
+                .roots(),
+            ),
+            _ => None,
+        },
         // Range should have been unfolded to intersection of Ancestors.
         _ => None,
     })

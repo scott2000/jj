@@ -2407,9 +2407,9 @@ pub fn optimize<St: ExpressionState>(
     let expression = resolve_referenced_commits(&expression).unwrap_or(expression);
     let expression = unfold_difference(&expression).unwrap_or(expression);
     let expression = fold_redundant_expression(&expression).unwrap_or(expression);
-    let expression = fold_generation(&expression).unwrap_or(expression);
     let expression = flatten_intersections(&expression).unwrap_or(expression);
     let expression = sort_negations_and_ancestors(&expression).unwrap_or(expression);
+    let expression = fold_generation(&expression).unwrap_or(expression);
     let expression = internalize_filter(&expression).unwrap_or(expression);
     let expression = fold_ancestors_union(&expression).unwrap_or(expression);
     let expression = fold_heads_range(&expression).unwrap_or(expression);

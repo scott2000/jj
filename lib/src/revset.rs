@@ -2336,6 +2336,79 @@ fn unfold_difference<St: ExpressionState>(
     })
 }
 
+/// Transforms `a::b` into `::b & a::`.
+///
+/// Should only be applied after `sort_negations_and_ancestors()`, since it
+/// would separate ancestors expressions from descendants expressions, which
+/// would prevent folding these back together later. Should be applied before
+/// `fold_generations()`, since this rule creates more opportunities.
+fn unfold_dag_range<St: ExpressionState>(
+    expression: &Rc<RevsetExpression<St>>,
+) -> TransformedExpression<St> {
+    transform_expression_bottom_up(expression, |expression| match expression.as_ref() {
+        // roots::heads -> ::heads & roots::
+        RevsetExpression::DagRange {
+            roots,
+            heads,
+            generation_from_roots,
+        } => {
+            let roots_descendants = Rc::new(RevsetExpression::Descendants {
+                roots: roots.clone(),
+                generation: generation_from_roots.clone(),
+            });
+            // Putting `::heads` before `roots::` allows `heads(a::b)` to be optimized.
+            Some(heads.ancestors().intersection(&roots_descendants))
+        }
+        _ => None,
+    })
+}
+
+/// Transforms expressions like `a:: & ::b` or `::b & a::` to `a::b`.
+///
+/// Should be applied before `fold_difference()`, since `~::a & ::b & c::`
+/// should be optimized to `c::b ~ ::a` instead of `a..b & c::visible_heads()`.
+fn fold_dag_range<St: ExpressionState>(
+    expression: &Rc<RevsetExpression<St>>,
+) -> TransformedExpression<St> {
+    fn to_dag_range<St: ExpressionState>(
+        a: &RevsetExpression<St>,
+        b: &RevsetExpression<St>,
+    ) -> Option<Rc<RevsetExpression<St>>> {
+        let (heads, descendants) = {
+            if let Ok(heads) = ancestors_to_heads(a) {
+                (heads, b)
+            } else if let Ok(heads) = ancestors_to_heads(b) {
+                (heads, a)
+            } else {
+                return None;
+            }
+        };
+        let RevsetExpression::Descendants { roots, generation } = descendants else {
+            return None;
+        };
+        Some(
+            RevsetExpression::DagRange {
+                roots: roots.clone(),
+                heads: heads,
+                generation_from_roots: generation.clone(),
+            }
+            .into(),
+        )
+    }
+
+    transform_expression_bottom_up(expression, |expression| match expression.as_ref() {
+        RevsetExpression::Intersection(expression1, expression2) => {
+            match (expression1.as_ref(), expression2.as_ref()) {
+                (RevsetExpression::Intersection(inner1, inner2), _) => {
+                    to_dag_range(inner2, expression2).map(|folded| inner1.intersection(&folded))
+                }
+                _ => to_dag_range(expression1, expression2),
+            }
+        }
+        _ => None,
+    })
+}
+
 /// Transforms nested `ancestors()`/`parents()`/`descendants()`/`children()`
 /// like `h---`/`r+++`.
 fn fold_generation<St: ExpressionState>(
@@ -2409,10 +2482,12 @@ pub fn optimize<St: ExpressionState>(
     let expression = fold_redundant_expression(&expression).unwrap_or(expression);
     let expression = flatten_intersections(&expression).unwrap_or(expression);
     let expression = sort_negations_and_ancestors(&expression).unwrap_or(expression);
+    let expression = unfold_dag_range(&expression).unwrap_or(expression);
     let expression = fold_generation(&expression).unwrap_or(expression);
     let expression = internalize_filter(&expression).unwrap_or(expression);
     let expression = fold_ancestors_union(&expression).unwrap_or(expression);
     let expression = fold_heads_range(&expression).unwrap_or(expression);
+    let expression = fold_dag_range(&expression).unwrap_or(expression);
     let expression = fold_difference(&expression).unwrap_or(expression);
     fold_not_in_ancestors(&expression).unwrap_or(expression)
 }
@@ -5572,17 +5647,11 @@ mod tests {
         }
         "#);
 
-        // TODO: Inner Descendants can be folded into DagRange. Perhaps, we can rewrite
-        // 'x::y' to 'x:: & ::y' first, so the common substitution rule can handle both
-        // 'x+::y' and 'x+ & ::y'.
         insta::assert_debug_snapshot!(optimize(parse("(foo++)::bar").unwrap()), @r#"
         DagRange {
-            roots: Descendants {
-                roots: CommitRef(Symbol("foo")),
-                generation: 2..3,
-            },
+            roots: CommitRef(Symbol("foo")),
             heads: CommitRef(Symbol("bar")),
-            generation_from_roots: 0..18446744073709551615,
+            generation_from_roots: 2..18446744073709551615,
         }
         "#);
     }

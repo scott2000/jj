@@ -273,7 +273,7 @@ pub enum RevsetExpression<St: ExpressionState> {
     DagRange {
         roots: Rc<Self>,
         heads: Rc<Self>,
-        // TODO: maybe add generation_from_roots/heads?
+        generation_from_roots: Range<u64>,
     },
     // Commits reachable from "sources" within "domain"
     Reachable {
@@ -535,6 +535,7 @@ impl<St: ExpressionState> RevsetExpression<St> {
         Rc::new(Self::DagRange {
             roots: self.clone(),
             heads: heads.clone(),
+            generation_from_roots: GENERATION_RANGE_FULL,
         })
     }
 
@@ -1407,10 +1408,17 @@ fn try_transform_expression<St: ExpressionState, E>(
                     parents_range: parents_range.clone(),
                 }
             }),
-            RevsetExpression::DagRange { roots, heads } => {
-                transform_rec_pair((roots, heads), pre, post)?
-                    .map(|(roots, heads)| RevsetExpression::DagRange { roots, heads })
-            }
+            RevsetExpression::DagRange {
+                roots,
+                heads,
+                generation_from_roots,
+            } => transform_rec_pair((roots, heads), pre, post)?.map(|(roots, heads)| {
+                RevsetExpression::DagRange {
+                    roots,
+                    heads,
+                    generation_from_roots: generation_from_roots.clone(),
+                }
+            }),
             RevsetExpression::Reachable { sources, domain } => {
                 transform_rec_pair((sources, domain), pre, post)?
                     .map(|(sources, domain)| RevsetExpression::Reachable { sources, domain })
@@ -1643,10 +1651,20 @@ where
             }
             .into()
         }
-        RevsetExpression::DagRange { roots, heads } => {
+        RevsetExpression::DagRange {
+            roots,
+            heads,
+            generation_from_roots,
+        } => {
             let roots = folder.fold_expression(roots)?;
             let heads = folder.fold_expression(heads)?;
-            RevsetExpression::DagRange { roots, heads }.into()
+            let generation_from_roots = generation_from_roots.clone();
+            RevsetExpression::DagRange {
+                roots,
+                heads,
+                generation_from_roots,
+            }
+            .into()
         }
         RevsetExpression::Reachable { sources, domain } => {
             let sources = folder.fold_expression(sources)?;
@@ -2390,6 +2408,23 @@ fn fold_generation<St: ExpressionState>(
                 _ => None,
             }
         }
+        RevsetExpression::DagRange {
+            roots,
+            heads,
+            generation_from_roots: generation1,
+        } => match roots.as_ref() {
+            // (a+)::b -> dag_range(descendants(a, 1), b, ..) -> dag_range(a, b, 1..)
+            // ((a+)::)::b -> dag_range(descendants(a, 1..), b, ..) -> dag_range(a, b, 1..)
+            RevsetExpression::Descendants {
+                roots,
+                generation: generation2,
+            } => Some(Rc::new(RevsetExpression::DagRange {
+                roots: roots.clone(),
+                heads: heads.clone(),
+                generation_from_roots: add_generation(generation1, generation2),
+            })),
+            _ => None,
+        },
         // Range should have been unfolded to intersection of Ancestors.
         _ => None,
     })
@@ -2970,10 +3005,14 @@ impl VisibilityResolutionContext<'_> {
                 generation: generation.clone(),
                 parents_range: parents_range.clone(),
             },
-            RevsetExpression::DagRange { roots, heads } => ResolvedExpression::DagRange {
+            RevsetExpression::DagRange {
+                roots,
+                heads,
+                generation_from_roots,
+            } => ResolvedExpression::DagRange {
                 roots: self.resolve(roots).into(),
                 heads: self.resolve(heads).into(),
-                generation_from_roots: GENERATION_RANGE_FULL,
+                generation_from_roots: generation_from_roots.clone(),
             },
             RevsetExpression::Reachable { sources, domain } => ResolvedExpression::Reachable {
                 sources: self.resolve(sources).into(),
@@ -3532,6 +3571,7 @@ mod tests {
         DagRange {
             roots: CommitRef(Symbol("foo")),
             heads: CommitRef(WorkingCopy(WorkspaceNameBuf("default"))),
+            generation_from_roots: 0..18446744073709551615,
         }
         "#);
         insta::assert_debug_snapshot!(
@@ -3539,6 +3579,7 @@ mod tests {
         DagRange {
             roots: CommitRef(Symbol("foo")),
             heads: CommitRef(Symbol("foo")),
+            generation_from_roots: 0..18446744073709551615,
         }
         "#);
         insta::assert_debug_snapshot!(
@@ -3758,6 +3799,7 @@ mod tests {
         DagRange {
             roots: CommitRef(Symbol("foo")),
             heads: CommitRef(Symbol("bar")),
+            generation_from_roots: 0..18446744073709551615,
         }
         "#);
         // Parse the nullary "dag range" operator
@@ -4509,6 +4551,7 @@ mod tests {
         DagRange {
             roots: CommitRef(Bookmarks(Substring(""))),
             heads: CommitRef(Tags(Substring(""))),
+            generation_from_roots: 0..18446744073709551615,
         }
         "#);
 
@@ -5581,16 +5624,11 @@ mod tests {
         }
         "#);
 
-        // TODO: Inner Descendants can be folded into DagRange. Perhaps, we can rewrite
-        // 'x::y' to 'x:: & ::y' first, so the common substitution rule can handle both
-        // 'x+::y' and 'x+ & ::y'.
         insta::assert_debug_snapshot!(optimize(parse("(foo++)::bar").unwrap()), @r#"
         DagRange {
-            roots: Descendants {
-                roots: CommitRef(Symbol("foo")),
-                generation: 2..3,
-            },
+            roots: CommitRef(Symbol("foo")),
             heads: CommitRef(Symbol("bar")),
+            generation_from_roots: 2..18446744073709551615,
         }
         "#);
     }

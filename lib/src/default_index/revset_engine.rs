@@ -14,6 +14,7 @@
 
 #![allow(missing_docs)]
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::cmp::Reverse;
@@ -103,6 +104,13 @@ trait InternalRevset: fmt::Debug + ToPredicateFn {
     fn into_predicate<'a>(self: Box<Self>) -> Box<dyn ToPredicateFn + 'a>
     where
         Self: 'a;
+
+    fn collect_positions(
+        &'_ self,
+        index: &CompositeIndex,
+    ) -> Result<Cow<'_, [GlobalCommitPosition]>, RevsetEvaluationError> {
+        self.positions().attach(index).try_collect().map(Cow::Owned)
+    }
 }
 
 impl<T: InternalRevset + ?Sized> InternalRevset for Box<T> {
@@ -118,6 +126,13 @@ impl<T: InternalRevset + ?Sized> InternalRevset for Box<T> {
         Self: 'a,
     {
         <T as InternalRevset>::into_predicate(*self)
+    }
+
+    fn collect_positions(
+        &'_ self,
+        index: &CompositeIndex,
+    ) -> Result<Cow<'_, [GlobalCommitPosition]>, RevsetEvaluationError> {
+        <T as InternalRevset>::collect_positions(self, index)
     }
 }
 
@@ -319,6 +334,13 @@ impl InternalRevset for EagerRevset {
         Self: 'a,
     {
         self
+    }
+
+    fn collect_positions(
+        &'_ self,
+        _index: &CompositeIndex,
+    ) -> Result<Cow<'_, [GlobalCommitPosition]>, RevsetEvaluationError> {
+        Ok(Cow::Borrowed(&self.positions))
     }
 }
 
@@ -917,7 +939,7 @@ impl EvaluationContext<'_> {
 
                 // Compute all reachable subgraphs.
                 let domain_revset = self.evaluate(domain)?;
-                let domain_vec: Vec<_> = domain_revset.positions().attach(index).try_collect()?;
+                let domain_vec = domain_revset.collect_positions(index)?;
                 let domain_set: HashSet<_> = domain_vec.iter().copied().collect();
                 for pos in &domain_set {
                     for parent_pos in index.commits().entry_by_pos(*pos).parent_positions() {
@@ -948,7 +970,8 @@ impl EvaluationContext<'_> {
                 }
 
                 let positions = domain_vec
-                    .into_iter()
+                    .iter()
+                    .copied()
                     .zip(domain_reps)
                     .filter_map(|(pos, rep)| set_reps.contains(&rep).then_some(pos))
                     .collect_vec();
@@ -968,7 +991,7 @@ impl EvaluationContext<'_> {
                 filter,
             } => {
                 let root_set = self.evaluate(roots)?;
-                let root_positions: Vec<_> = root_set.positions().attach(index).try_collect()?;
+                let root_positions = root_set.collect_positions(index)?.into_owned();
                 // Pre-filter heads so queries like 'immutable_heads()..' can
                 // terminate early. immutable_heads() usually includes some
                 // visible heads, which can be trivially rejected.
@@ -1036,9 +1059,9 @@ impl EvaluationContext<'_> {
             ResolvedExpression::Bisect(candidates) => {
                 let set = self.evaluate(candidates)?;
                 // TODO: Make this more correct in non-linear history
-                let candidate_positions: Vec<_> = set.positions().attach(index).try_collect()?;
+                let candidate_positions = set.collect_positions(index)?;
                 let positions = if candidate_positions.is_empty() {
-                    candidate_positions
+                    candidate_positions.into_owned()
                 } else {
                     vec![candidate_positions[candidate_positions.len() / 2]]
                 };

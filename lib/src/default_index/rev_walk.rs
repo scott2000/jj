@@ -305,8 +305,8 @@ impl RevWalkIndex for RevWalkDescendantsIndex {
 #[must_use]
 pub(super) struct RevWalkBuilder<'a> {
     index: &'a CompositeIndex,
-    wanted: Vec<GlobalCommitPosition>,
-    unwanted: Vec<GlobalCommitPosition>,
+    wanted: &'a [GlobalCommitPosition],
+    unwanted: &'a [GlobalCommitPosition],
     wanted_parents_range: Range<u32>,
 }
 
@@ -314,14 +314,14 @@ impl<'a> RevWalkBuilder<'a> {
     pub fn new(index: &'a CompositeIndex) -> Self {
         Self {
             index,
-            wanted: Vec::new(),
-            unwanted: Vec::new(),
+            wanted: &[],
+            unwanted: &[],
             wanted_parents_range: PARENTS_RANGE_FULL,
         }
     }
 
     /// Sets head positions to be included.
-    pub fn wanted_heads(mut self, positions: Vec<GlobalCommitPosition>) -> Self {
+    pub fn wanted_heads(mut self, positions: &'a [GlobalCommitPosition]) -> Self {
         self.wanted = positions;
         self
     }
@@ -334,7 +334,7 @@ impl<'a> RevWalkBuilder<'a> {
     }
 
     /// Sets root positions to be excluded. The roots precede the heads.
-    pub fn unwanted_roots(mut self, positions: Vec<GlobalCommitPosition>) -> Self {
+    pub fn unwanted_roots(mut self, positions: &'a [GlobalCommitPosition]) -> Self {
         self.unwanted = positions;
         self
     }
@@ -349,8 +349,8 @@ impl<'a> RevWalkBuilder<'a> {
         let wanted_parents_range = self.wanted_parents_range;
         let mut wanted_queue = RevWalkQueue::with_min_pos(min_pos);
         let mut unwanted_queue = RevWalkQueue::with_min_pos(min_pos);
-        wanted_queue.extend(self.wanted, ());
-        unwanted_queue.extend(self.unwanted, ());
+        wanted_queue.extend(self.wanted.iter().copied(), ());
+        unwanted_queue.extend(self.unwanted.iter().copied(), ());
         RevWalkBorrowedIndexIter {
             index,
             walk: RevWalkImpl {
@@ -373,8 +373,8 @@ impl<'a> RevWalkBuilder<'a> {
         let mut wanted_queue = RevWalkQueue::with_min_pos(GlobalCommitPosition::MIN);
         let mut unwanted_queue = RevWalkQueue::with_min_pos(GlobalCommitPosition::MIN);
         let item_range = RevWalkItemGenerationRange::from_filter_range(generation_range.clone());
-        wanted_queue.extend(self.wanted, Reverse(item_range));
-        unwanted_queue.extend(self.unwanted, ());
+        wanted_queue.extend(self.wanted.iter().copied(), Reverse(item_range));
+        unwanted_queue.extend(self.unwanted.iter().copied(), ());
         RevWalkBorrowedIndexIter {
             index,
             walk: RevWalkGenerationRangeImpl {
@@ -436,7 +436,7 @@ impl<'a> RevWalkBuilder<'a> {
     /// position.
     pub fn descendants_filtered_by_generation(
         self,
-        root_positions: Vec<GlobalCommitPosition>,
+        root_positions: &[GlobalCommitPosition],
         generation_range: Range<u32>,
     ) -> RevWalkDescendantsGenerationRange {
         let index = self.index;
@@ -446,7 +446,7 @@ impl<'a> RevWalkBuilder<'a> {
         let mut wanted_queue = RevWalkQueue::with_min_pos(Reverse(GlobalCommitPosition::MAX));
         let unwanted_queue = RevWalkQueue::with_min_pos(Reverse(GlobalCommitPosition::MAX));
         let item_range = RevWalkItemGenerationRange::from_filter_range(generation_range.clone());
-        for pos in root_positions {
+        for &pos in root_positions {
             // Do not add unreachable roots which shouldn't be visited
             if descendants_index.contains_pos(pos) {
                 wanted_queue.push(Reverse(pos), Reverse(item_range));

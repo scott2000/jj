@@ -834,9 +834,9 @@ impl EvaluationContext<'_> {
                 parents_range,
             } => {
                 let head_set = self.evaluate(heads)?;
-                let head_positions = head_set.positions().attach(index);
+                let head_positions = head_set.collect_positions(index)?;
                 let builder = RevWalkBuilder::new(index)
-                    .wanted_heads(head_positions.try_collect()?)
+                    .wanted_heads(&head_positions)
                     .wanted_parents_range(parents_range.clone());
                 if generation == &GENERATION_RANGE_FULL {
                     let walk = builder.ancestors().detach();
@@ -856,21 +856,22 @@ impl EvaluationContext<'_> {
                 parents_range,
             } => {
                 let root_set = self.evaluate(roots)?;
-                let root_positions: Vec<_> = root_set.positions().attach(index).try_collect()?;
+                let root_positions = root_set.collect_positions(index)?;
                 // Pre-filter heads so queries like 'immutable_heads()..' can
                 // terminate early. immutable_heads() usually includes some
                 // visible heads, which can be trivially rejected.
                 let head_set = self.evaluate(heads)?;
-                let head_positions = difference_by(
+                let head_positions: Vec<_> = difference_by(
                     head_set.positions(),
                     EagerRevWalk::new(root_positions.iter().copied().map(Ok)),
                     |pos1, pos2| pos1.cmp(pos2).reverse(),
                 )
-                .attach(index);
+                .attach(index)
+                .try_collect()?;
                 let builder = RevWalkBuilder::new(index)
-                    .wanted_heads(head_positions.try_collect()?)
+                    .wanted_heads(&head_positions)
                     .wanted_parents_range(parents_range.clone())
-                    .unwanted_roots(root_positions);
+                    .unwanted_roots(&root_positions);
                 if generation == &GENERATION_RANGE_FULL {
                     let walk = builder.ancestors().detach();
                     Ok(Box::new(RevWalkRevset { walk }))
@@ -888,13 +889,12 @@ impl EvaluationContext<'_> {
                 generation_from_roots,
             } => {
                 let root_set = self.evaluate(roots)?;
-                let root_positions = root_set.positions().attach(index);
                 let head_set = self.evaluate(heads)?;
-                let head_positions = head_set.positions().attach(index);
-                let builder =
-                    RevWalkBuilder::new(index).wanted_heads(head_positions.try_collect()?);
+                let head_positions = head_set.collect_positions(index)?;
+                let builder = RevWalkBuilder::new(index).wanted_heads(&head_positions);
                 if generation_from_roots == &(1..2) {
-                    let root_positions: HashSet<_> = root_positions.try_collect()?;
+                    let root_positions: HashSet<_> =
+                        root_set.positions().attach(index).try_collect()?;
                     let walk = builder
                         .ancestors_until_roots(root_positions.iter().copied())
                         .detach();
@@ -914,18 +914,19 @@ impl EvaluationContext<'_> {
                         predicate,
                     }))
                 } else if generation_from_roots == &GENERATION_RANGE_FULL {
-                    let mut positions = builder
-                        .descendants(root_positions.try_collect()?)
-                        .collect_vec();
+                    let root_positions: HashSet<_> =
+                        root_set.positions().attach(index).try_collect()?;
+                    let mut positions = builder.descendants(root_positions).collect_vec();
                     positions.reverse();
                     Ok(Box::new(EagerRevset { positions }))
                 } else {
+                    let root_positions = root_set.collect_positions(index)?;
                     // For small generation range, it might be better to build a reachable map
                     // with generation bit set, which can be calculated incrementally from roots:
                     //   reachable[pos] = (reachable[parent_pos] | ...) << 1
                     let mut positions = builder
                         .descendants_filtered_by_generation(
-                            root_positions.try_collect()?,
+                            &root_positions,
                             to_u32_generation_range(generation_from_roots)?,
                         )
                         .map(|Reverse(pos)| pos)
@@ -1023,13 +1024,12 @@ impl EvaluationContext<'_> {
                 Ok(Box::new(EagerRevset { positions }))
             }
             ResolvedExpression::Roots(candidates) => {
-                let mut positions: Vec<_> = self
+                let mut positions = self
                     .evaluate(candidates)?
-                    .positions()
-                    .attach(index)
-                    .try_collect()?;
+                    .collect_positions(index)?
+                    .into_owned();
                 let filled = RevWalkBuilder::new(index)
-                    .wanted_heads(positions.clone())
+                    .wanted_heads(&positions)
                     .descendants(positions.iter().copied().collect())
                     .collect_positions_set();
                 positions.retain(|&pos| {

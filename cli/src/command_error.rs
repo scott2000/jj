@@ -947,6 +947,7 @@ fn revset_resolution_error_hints(err: &RevsetResolutionError) -> Vec<String> {
         | RevsetResolutionError::WorkspaceMissingWorkingCopy { .. }
         | RevsetResolutionError::AmbiguousCommitIdPrefix(_)
         | RevsetResolutionError::AmbiguousChangeIdPrefix(_)
+        | RevsetResolutionError::InvalidChangeOffset { .. }
         | RevsetResolutionError::Backend(_)
         | RevsetResolutionError::Other(_) => vec![],
     }

@@ -252,13 +252,14 @@ impl MergedTree {
             },
             None => Ok(self
                 .trees
+                .as_ref()
                 .map(|tree| Some(TreeValue::Tree(tree.id().clone())))),
         }
     }
 
     /// The tree's id
     pub fn id(&self) -> MergedTreeId {
-        MergedTreeId::Merge(self.trees.map(|tree| tree.id().clone()))
+        MergedTreeId::Merge(self.trees.as_ref().map(|tree| tree.id().clone()))
     }
 
     /// Look up the tree at the given path.
@@ -467,7 +468,7 @@ fn trees_value<'a>(trees: &'a Merge<Tree>, basename: &RepoPathComponent) -> Merg
     if let Some(tree) = trees.as_resolved() {
         return Merge::resolved(tree.value(basename));
     }
-    let value = trees.map(|tree| tree.value(basename));
+    let value = trees.as_ref().map(|tree| tree.value(basename));
     if let Some(resolved) = value.resolve_trivial() {
         return Merge::resolved(*resolved);
     }
@@ -518,7 +519,13 @@ impl MergedTreeInput {
             Merge::resolved(backend::Tree::from_sorted_entries(all_entries))
         } else {
             // Create a Merge with the conflict entries for each side.
-            let mut conflict_entries = self.conflicts.first_key_value().unwrap().1.map(|_| vec![]);
+            let mut conflict_entries = self
+                .conflicts
+                .first_key_value()
+                .unwrap()
+                .1
+                .as_ref()
+                .map(|_| vec![]);
             for (basename, value) in self.conflicts {
                 assert_eq!(value.num_sides(), conflict_entries.num_sides());
                 for (entries, value) in conflict_entries.iter_mut().zip(value.into_iter()) {
@@ -787,6 +794,7 @@ async fn try_resolve_file_values<T: Borrow<TreeValue>>(
     // The values may contain trees canceling each other (notably padded absent
     // trees), so we need to simplify them first.
     let simplified = values
+        .as_ref()
         .map(|value| value.as_ref().map(Borrow::borrow))
         .simplify();
     // No fast path for simplified.is_resolved(). If it could be resolved, it would

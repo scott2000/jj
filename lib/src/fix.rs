@@ -285,7 +285,7 @@ pub async fn fix_files(
         let mut has_changes = false;
         for repo_path in repo_paths {
             let old_value = old_tree.path_value_async(repo_path).await?;
-            let new_value = old_value.map(|old_term| {
+            let new_value = old_value.as_ref().map(|old_term| {
                 if let Some(TreeValue::File {
                     id,
                     executable,

@@ -221,6 +221,7 @@ impl Store {
             }
             MergedTreeId::Merge(ids) => {
                 let trees = ids
+                    .as_ref()
                     .try_map_async(|id| self.get_tree_async(RepoPathBuf::root(), id))
                     .await?;
                 Ok(MergedTree::new(trees))

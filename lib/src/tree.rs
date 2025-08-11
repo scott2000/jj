@@ -267,7 +267,7 @@ pub async fn try_resolve_file_conflict(
     // merge it. We check early so we don't waste time reading file contents if
     // we can't merge them anyway. At the same time we determine whether the
     // resulting file should be executable.
-    let Ok(file_id_conflict) = conflict.try_map(|term| match term {
+    let Ok(file_id_conflict) = conflict.as_ref().try_map(|term| match term {
         Some(TreeValue::File {
             id,
             executable: _,
@@ -277,7 +277,7 @@ pub async fn try_resolve_file_conflict(
     }) else {
         return Ok(None);
     };
-    let Ok(executable_conflict) = conflict.try_map(|term| match term {
+    let Ok(executable_conflict) = conflict.as_ref().try_map(|term| match term {
         Some(TreeValue::File {
             id: _,
             executable,
@@ -287,7 +287,7 @@ pub async fn try_resolve_file_conflict(
     }) else {
         return Ok(None);
     };
-    let Ok(copy_id_conflict) = conflict.try_map(|term| match term {
+    let Ok(copy_id_conflict) = conflict.as_ref().try_map(|term| match term {
         Some(TreeValue::File {
             id: _,
             executable: _,

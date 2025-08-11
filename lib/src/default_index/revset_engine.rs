@@ -1438,8 +1438,12 @@ fn diff_match_lines(
         let right_lines = match_lines(right, pattern);
         Ok(left_lines.ne(right_lines))
     } else {
-        let lefts: Merge<BString> = lefts.map(|text| match_lines(text, pattern).collect());
-        let rights: Merge<BString> = rights.map(|text| match_lines(text, pattern).collect());
+        let lefts: Merge<BString> = lefts
+            .as_ref()
+            .map(|text| match_lines(text, pattern).collect());
+        let rights: Merge<BString> = rights
+            .as_ref()
+            .map(|text| match_lines(text, pattern).collect());
         let lefts = files::merge(&lefts);
         let rights = files::merge(&rights);
         let diff = Diff::by_line(lefts.iter().chain(rights.iter()));

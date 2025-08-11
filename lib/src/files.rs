@@ -339,7 +339,7 @@ fn collect_hunks<'input>(hunks: impl IntoIterator<Item = Merge<&'input BStr>>) -
                 merge_hunks.push(Merge::resolved(resolved_hunk));
                 resolved_hunk = BString::new(vec![]);
             }
-            merge_hunks.push(hunk.map(|&s| s.to_owned()));
+            merge_hunks.push(hunk.map(ToOwned::to_owned));
         }
     }
 

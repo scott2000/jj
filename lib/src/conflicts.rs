@@ -124,6 +124,7 @@ pub async fn extract_as_single_hunk(
     path: &RepoPath,
 ) -> BackendResult<Merge<BString>> {
     merge
+        .as_ref()
         .try_map_async(|term| get_file_contents(store, path, term))
         .await
 }
@@ -1000,7 +1001,7 @@ pub async fn update_from_content(
         }
     }
 
-    let mut contents = simplified_file_ids.map(|_| vec![]);
+    let mut contents = simplified_file_ids.as_ref().map(|_| vec![]);
     for hunk in hunks {
         if let Some(slice) = hunk.as_resolved() {
             for content in contents.iter_mut() {

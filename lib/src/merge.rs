@@ -346,33 +346,33 @@ impl<T> Merge<T> {
         self.values.iter_mut()
     }
 
+    /// Converts `&Merge<T>` into `Merge<&T>`.
+    pub fn as_ref(&self) -> Merge<&T> {
+        let values = self.values.iter().collect();
+        Merge { values }
+    }
+
     /// Creates a new merge by applying `f` to each remove and add.
-    pub fn map<'a, U>(&'a self, f: impl FnMut(&'a T) -> U) -> Merge<U> {
-        let values = self.values.iter().map(f).collect();
+    pub fn map<U>(self, f: impl FnMut(T) -> U) -> Merge<U> {
+        let values = self.values.into_iter().map(f).collect();
         Merge { values }
     }
 
     /// Creates a new merge by applying `f` to each remove and add, returning
     /// `Err if `f` returns `Err` for any of them.
-    pub fn try_map<'a, U, E>(
-        &'a self,
-        f: impl FnMut(&'a T) -> Result<U, E>,
-    ) -> Result<Merge<U>, E> {
-        let values = self.values.iter().map(f).try_collect()?;
+    pub fn try_map<U, E>(self, f: impl FnMut(T) -> Result<U, E>) -> Result<Merge<U>, E> {
+        let values = self.values.into_iter().map(f).try_collect()?;
         Ok(Merge { values })
     }
 
     /// Creates a new merge by applying the async function `f` to each remove
     /// and add, running them concurrently, and returning `Err if `f`
     /// returns `Err` for any of them.
-    pub async fn try_map_async<'a, F, U, E>(
-        &'a self,
-        f: impl FnMut(&'a T) -> F,
-    ) -> Result<Merge<U>, E>
+    pub async fn try_map_async<F, U, E>(self, f: impl FnMut(T) -> F) -> Result<Merge<U>, E>
     where
         F: Future<Output = Result<U, E>>,
     {
-        let values = try_join_all(self.values.iter().map(f)).await?;
+        let values = try_join_all(self.values.into_iter().map(f)).await?;
         Ok(Merge {
             values: values.into(),
         })
@@ -477,7 +477,7 @@ impl<T> Merge<Option<T>> {
 impl<T: Clone> Merge<Option<&T>> {
     /// Creates a new merge by cloning inner `Option<&T>`s.
     pub fn cloned(&self) -> Merge<Option<T>> {
-        self.map(|value| value.cloned())
+        self.as_ref().map(|value| value.cloned())
     }
 }
 
@@ -582,6 +582,7 @@ where
     /// executable bits preserved.
     pub fn to_file_merge(&self) -> Option<Merge<Option<FileId>>> {
         let file_ids = self
+            .as_ref()
             .try_map(|term| match borrow_tree_value(term.as_ref()) {
                 None => Ok(None),
                 Some(TreeValue::File {
@@ -599,31 +600,33 @@ where
     /// If this merge contains only files or absent entries, returns a merge of
     /// the files' executable bits.
     pub fn to_executable_merge(&self) -> Option<Merge<Option<bool>>> {
-        self.try_map(|term| match borrow_tree_value(term.as_ref()) {
-            None => Ok(None),
-            Some(TreeValue::File {
-                id: _,
-                executable,
-                copy_id: _,
-            }) => Ok(Some(*executable)),
-            _ => Err(()),
-        })
-        .ok()
+        self.as_ref()
+            .try_map(|term| match borrow_tree_value(term.as_ref()) {
+                None => Ok(None),
+                Some(TreeValue::File {
+                    id: _,
+                    executable,
+                    copy_id: _,
+                }) => Ok(Some(*executable)),
+                _ => Err(()),
+            })
+            .ok()
     }
 
     /// If this merge contains only files or absent entries, returns a merge of
     /// the files' copy IDs.
     pub fn to_copy_id_merge(&self) -> Option<Merge<Option<CopyId>>> {
-        self.try_map(|term| match borrow_tree_value(term.as_ref()) {
-            None => Ok(None),
-            Some(TreeValue::File {
-                id: _,
-                executable: _,
-                copy_id,
-            }) => Ok(Some(copy_id.clone())),
-            _ => Err(()),
-        })
-        .ok()
+        self.as_ref()
+            .try_map(|term| match borrow_tree_value(term.as_ref()) {
+                None => Ok(None),
+                Some(TreeValue::File {
+                    id: _,
+                    executable: _,
+                    copy_id,
+                }) => Ok(Some(copy_id.clone())),
+                _ => Err(()),
+            })
+            .ok()
     }
 
     /// If every non-`None` term of a `MergedTreeValue`
@@ -635,11 +638,13 @@ where
         store: &Arc<Store>,
         dir: &RepoPath,
     ) -> BackendResult<Option<Merge<Tree>>> {
-        let tree_id_merge = self.try_map(|term| match borrow_tree_value(term.as_ref()) {
-            None => Ok(None),
-            Some(TreeValue::Tree(id)) => Ok(Some(id)),
-            Some(_) => Err(()),
-        });
+        let tree_id_merge = self
+            .as_ref()
+            .try_map(|term| match borrow_tree_value(term.as_ref()) {
+                None => Ok(None),
+                Some(TreeValue::Tree(id)) => Ok(Some(id)),
+                Some(_) => Err(()),
+            });
         if let Ok(tree_id_merge) = tree_id_merge {
             Ok(Some(
                 tree_id_merge
@@ -1168,7 +1173,7 @@ mod tests {
 
     #[test]
     fn test_map() {
-        fn increment(i: &i32) -> i32 {
+        fn increment(i: i32) -> i32 {
             i + 1
         }
         // 1-way merge
@@ -1179,7 +1184,7 @@ mod tests {
 
     #[test]
     fn test_try_map() {
-        fn sqrt(i: &i32) -> Result<i32, ()> {
+        fn sqrt(i: i32) -> Result<i32, ()> {
             if *i >= 0 {
                 Ok((*i as f64).sqrt() as i32)
             } else {

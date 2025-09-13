@@ -272,6 +272,14 @@ impl<'a> PositionsAccumulator<'a> {
         Ok(found)
     }
 
+    /// Create a rev walk that caches any positions it finds.
+    fn rev_walk(self: &Rc<Self>) -> PositionsAccumulatorRevWalk<'a> {
+        PositionsAccumulatorRevWalk {
+            offset: 0,
+            positions: self.clone(),
+        }
+    }
+
     #[cfg(test)]
     fn consumed_len(&self) -> usize {
         self.inner.borrow().consumed_positions.len()
@@ -302,6 +310,31 @@ impl PositionsAccumulatorInner<'_> {
             }
         }
         Ok(())
+    }
+}
+
+struct PositionsAccumulatorRevWalk<'a> {
+    offset: usize,
+    positions: Rc<PositionsAccumulator<'a>>,
+}
+
+impl RevWalk<CompositeIndex> for PositionsAccumulatorRevWalk<'_> {
+    type Item = Result<GlobalCommitPosition, RevsetEvaluationError>;
+
+    fn next(&mut self, index: &CompositeIndex) -> Option<Self::Item> {
+        let mut inner = self.positions.inner.borrow_mut();
+        if let Some(&position) = inner.consumed_positions.get(self.offset) {
+            return Some(Ok(position));
+        }
+        assert!(self.offset == inner.consumed_positions.len());
+        match inner.walk.next(index)? {
+            Ok(position) => {
+                inner.consumed_positions.push(position);
+                self.offset += 1;
+                Some(Ok(position))
+            }
+            Err(err) => Some(Err(err)),
+        }
     }
 }
 

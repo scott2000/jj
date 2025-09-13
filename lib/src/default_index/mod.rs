@@ -29,6 +29,7 @@ mod rev_walk;
 mod rev_walk_queue;
 mod revset_engine;
 mod revset_graph_iterator;
+mod revset_optimizer;
 mod store;
 
 pub use self::mutable::DefaultMutableIndex;

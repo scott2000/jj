@@ -79,7 +79,7 @@ impl CopyId {
 #[error("Out-of-range date")]
 pub struct TimestampOutOfRange;
 
-#[derive(ContentHash, Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
+#[derive(ContentHash, Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash)]
 pub struct MillisSinceEpoch(pub i64);
 
 #[derive(ContentHash, Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]

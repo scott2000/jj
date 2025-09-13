@@ -73,7 +73,7 @@ pub enum DatePatternParseError {
 }
 
 /// Represents an range of dates that may be matched against.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum DatePattern {
     /// Represents all dates at or after the given instant.
     AtOrAfter(MillisSinceEpoch),

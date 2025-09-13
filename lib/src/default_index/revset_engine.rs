@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::cell::OnceCell;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::cmp::Reverse;
@@ -48,6 +49,7 @@ use crate::default_index::revset_optimizer::OptimizedPredicateExpression;
 use crate::default_index::revset_optimizer::OptimizedRevsetExpression;
 use crate::default_index::revset_optimizer::RevsetOptimizerState;
 use crate::default_index::revset_optimizer::RevsetRef;
+use crate::default_index::revset_optimizer::RevsetUsage;
 use crate::diff::Diff;
 use crate::diff::DiffHunkKind;
 use crate::files;
@@ -815,6 +817,61 @@ where
     }
 }
 
+struct CachedRevset<'a, S> {
+    inner: S,
+    positions_accumulator: OnceCell<Rc<PositionsAccumulator<'a>>>,
+}
+
+impl<'a, S> CachedRevset<'a, S>
+where
+    S: InternalRevset + 'a,
+{
+    fn positions(&self) -> &Rc<PositionsAccumulator<'a>> {
+        self.positions_accumulator
+            .get_or_init(|| Rc::new(PositionsAccumulator::new(self.inner.positions())))
+    }
+}
+
+impl<S: fmt::Debug> fmt::Debug for CachedRevset<'_, S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CachedRevset")
+            .field("inner", &self.inner)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a, S> InternalRevset for CachedRevset<'a, S>
+where
+    S: InternalRevset + 'a,
+{
+    fn positions<'b>(&self) -> BoxedRevWalk<'b>
+    where
+        Self: 'b,
+    {
+        Box::new(self.positions().rev_walk())
+    }
+
+    fn into_predicate<'b>(self: Box<Self>) -> Box<dyn ToPredicateFn + 'b>
+    where
+        Self: 'b,
+    {
+        self
+    }
+}
+
+impl<'a, S> ToPredicateFn for CachedRevset<'a, S>
+where
+    S: InternalRevset + 'a,
+{
+    fn to_predicate_fn<'b>(&self) -> BoxedPredicateFn<'b>
+    where
+        Self: 'b,
+    {
+        let positions = self.positions().clone();
+        Box::new(move |index, pos| positions.contains_position(index, pos))
+    }
+}
+
 pub(super) fn evaluate<I: AsCompositeIndex + Clone>(
     expression: &ResolvedExpression,
     store: &Arc<Store>,
@@ -852,10 +909,15 @@ impl EvaluationContext<'_> {
         &self,
         revset_ref: RevsetRef,
     ) -> Result<Box<dyn InternalRevset>, RevsetEvaluationError> {
-        let (expression, _usage) = self.state.get(revset_ref);
+        let (expression, usage) = self.state.get(revset_ref);
         let evaluated = self.evaluate_expression(expression)?;
-        // TODO: cache revsets if used multiple times
-        Ok(evaluated)
+        match usage {
+            RevsetUsage::Once => Ok(evaluated),
+            RevsetUsage::Many => Ok(Box::new(CachedRevset {
+                inner: evaluated,
+                positions_accumulator: OnceCell::new(),
+            })),
+        }
     }
 
     fn evaluate_expression(

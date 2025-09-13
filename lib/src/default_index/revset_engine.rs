@@ -224,33 +224,45 @@ impl<I: AsCompositeIndex + Clone> Revset for RevsetImpl<I> {
     where
         Self: 'a,
     {
-        let positions = PositionsAccumulator::new(self.index.clone(), self.inner.positions());
-        Box::new(move |commit_id| positions.contains(commit_id))
+        let index = self.index.clone();
+        let positions = PositionsAccumulator::new(self.inner.positions());
+        Box::new(move |commit_id| positions.contains(index.as_composite(), commit_id))
     }
 }
 
 /// Incrementally consumes `RevWalk` of the revset collecting positions.
-struct PositionsAccumulator<'a, I> {
-    index: I,
+struct PositionsAccumulator<'a> {
     inner: RefCell<PositionsAccumulatorInner<'a>>,
 }
 
-impl<'a, I: AsCompositeIndex> PositionsAccumulator<'a, I> {
-    fn new(index: I, walk: BoxedRevWalk<'a>) -> Self {
+impl<'a> PositionsAccumulator<'a> {
+    fn new(walk: BoxedRevWalk<'a>) -> Self {
         let inner = RefCell::new(PositionsAccumulatorInner {
             walk,
             consumed_positions: Vec::new(),
         });
-        Self { index, inner }
+        Self { inner }
     }
 
     /// Checks whether the commit is in the revset.
-    fn contains(&self, commit_id: &CommitId) -> Result<bool, RevsetEvaluationError> {
-        let index = self.index.as_composite();
-        let Some(position) = index.commits().commit_id_to_pos(commit_id) else {
-            return Ok(false);
-        };
+    fn contains(
+        &self,
+        index: &CompositeIndex,
+        commit_id: &CommitId,
+    ) -> Result<bool, RevsetEvaluationError> {
+        if let Some(position) = index.commits().commit_id_to_pos(commit_id) {
+            self.contains_position(index, position)
+        } else {
+            Ok(false)
+        }
+    }
 
+    /// Checks whether the position is in the revset.
+    fn contains_position(
+        &self,
+        index: &CompositeIndex,
+        position: GlobalCommitPosition,
+    ) -> Result<bool, RevsetEvaluationError> {
         let mut inner = self.inner.borrow_mut();
         inner.consume_to(index, position)?;
         let found = inner
@@ -1802,41 +1814,41 @@ mod tests {
         let full_set = make_set(&[&id_4, &id_3, &id_2, &id_1, &id_0]);
 
         // Consumes entries incrementally
-        let positions_accum = PositionsAccumulator::new(index, full_set.positions());
+        let positions_accum = PositionsAccumulator::new(full_set.positions());
 
-        assert!(positions_accum.contains(&id_3).unwrap());
+        assert!(positions_accum.contains(index, &id_3).unwrap());
         assert_eq!(positions_accum.consumed_len(), 2);
 
-        assert!(positions_accum.contains(&id_0).unwrap());
+        assert!(positions_accum.contains(index, &id_0).unwrap());
         assert_eq!(positions_accum.consumed_len(), 5);
 
-        assert!(positions_accum.contains(&id_3).unwrap());
+        assert!(positions_accum.contains(index, &id_3).unwrap());
         assert_eq!(positions_accum.consumed_len(), 5);
 
         // Does not consume positions for unknown commits
-        let positions_accum = PositionsAccumulator::new(index, full_set.positions());
+        let positions_accum = PositionsAccumulator::new(full_set.positions());
 
         assert!(
             !positions_accum
-                .contains(&CommitId::from_hex("999999"))
+                .contains(index, &CommitId::from_hex("999999"))
                 .unwrap()
         );
         assert_eq!(positions_accum.consumed_len(), 0);
 
         // Does not consume without necessity
         let set = make_set(&[&id_3, &id_2, &id_1]);
-        let positions_accum = PositionsAccumulator::new(index, set.positions());
+        let positions_accum = PositionsAccumulator::new(set.positions());
 
-        assert!(!positions_accum.contains(&id_4).unwrap());
+        assert!(!positions_accum.contains(index, &id_4).unwrap());
         assert_eq!(positions_accum.consumed_len(), 1);
 
-        assert!(positions_accum.contains(&id_3).unwrap());
+        assert!(positions_accum.contains(index, &id_3).unwrap());
         assert_eq!(positions_accum.consumed_len(), 1);
 
-        assert!(!positions_accum.contains(&id_0).unwrap());
+        assert!(!positions_accum.contains(index, &id_0).unwrap());
         assert_eq!(positions_accum.consumed_len(), 3);
 
-        assert!(positions_accum.contains(&id_1).unwrap());
+        assert!(positions_accum.contains(index, &id_1).unwrap());
     }
 
     fn diff_match_lines_samples() -> (Merge<BString>, Merge<BString>) {

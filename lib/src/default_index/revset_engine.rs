@@ -44,6 +44,10 @@ use crate::backend::MillisSinceEpoch;
 use crate::commit::Commit;
 use crate::conflicts::MaterializedTreeValue;
 use crate::conflicts::materialize_tree_value;
+use crate::default_index::revset_optimizer::OptimizedPredicateExpression;
+use crate::default_index::revset_optimizer::OptimizedRevsetExpression;
+use crate::default_index::revset_optimizer::RevsetOptimizerState;
+use crate::default_index::revset_optimizer::RevsetRef;
 use crate::diff::Diff;
 use crate::diff::DiffHunkKind;
 use crate::files;
@@ -56,7 +60,6 @@ use crate::object_id::ObjectId as _;
 use crate::repo_path::RepoPath;
 use crate::revset::GENERATION_RANGE_FULL;
 use crate::revset::ResolvedExpression;
-use crate::revset::ResolvedPredicateExpression;
 use crate::revset::Revset;
 use crate::revset::RevsetContainingFn;
 use crate::revset::RevsetEvaluationError;
@@ -772,17 +775,21 @@ pub(super) fn evaluate<I: AsCompositeIndex + Clone>(
     store: &Arc<Store>,
     index: I,
 ) -> Result<RevsetImpl<I>, RevsetEvaluationError> {
+    let mut state = RevsetOptimizerState::default();
+    let revset_ref = state.insert(expression);
     let context = EvaluationContext {
         store: store.clone(),
         index: index.as_composite(),
+        state,
     };
-    let internal_revset = context.evaluate(expression)?;
+    let internal_revset = context.evaluate(revset_ref)?;
     Ok(RevsetImpl::new(internal_revset, index))
 }
 
 struct EvaluationContext<'index> {
     store: Arc<Store>,
     index: &'index CompositeIndex,
+    state: RevsetOptimizerState<'index>,
 }
 
 fn to_u32_generation_range(range: &Range<u64>) -> Result<Range<u32>, RevsetEvaluationError> {
@@ -798,19 +805,29 @@ fn to_u32_generation_range(range: &Range<u64>) -> Result<Range<u32>, RevsetEvalu
 impl EvaluationContext<'_> {
     fn evaluate(
         &self,
-        expression: &ResolvedExpression,
+        revset_ref: RevsetRef,
+    ) -> Result<Box<dyn InternalRevset>, RevsetEvaluationError> {
+        let (expression, _usage) = self.state.get(revset_ref);
+        let evaluated = self.evaluate_expression(expression)?;
+        // TODO: cache revsets if used multiple times
+        Ok(evaluated)
+    }
+
+    fn evaluate_expression(
+        &self,
+        expression: &OptimizedRevsetExpression,
     ) -> Result<Box<dyn InternalRevset>, RevsetEvaluationError> {
         let index = self.index;
         match expression {
-            ResolvedExpression::Commits(commit_ids) => {
+            OptimizedRevsetExpression::Commits(commit_ids) => {
                 Ok(Box::new(self.revset_for_commit_ids(commit_ids)?))
             }
-            ResolvedExpression::Ancestors {
+            OptimizedRevsetExpression::Ancestors {
                 heads,
                 generation,
                 parents_range,
             } => {
-                let head_set = self.evaluate(heads)?;
+                let head_set = self.evaluate(*heads)?;
                 let head_positions = head_set.positions().attach(index);
                 let builder = RevWalkBuilder::new(index)
                     .wanted_heads(head_positions.try_collect()?)
@@ -826,18 +843,18 @@ impl EvaluationContext<'_> {
                     Ok(Box::new(RevWalkRevset { walk }))
                 }
             }
-            ResolvedExpression::Range {
+            OptimizedRevsetExpression::Range {
                 roots,
                 heads,
                 generation,
                 parents_range,
             } => {
-                let root_set = self.evaluate(roots)?;
+                let root_set = self.evaluate(*roots)?;
                 let root_positions: Vec<_> = root_set.positions().attach(index).try_collect()?;
                 // Pre-filter heads so queries like 'immutable_heads()..' can
                 // terminate early. immutable_heads() usually includes some
                 // visible heads, which can be trivially rejected.
-                let head_set = self.evaluate(heads)?;
+                let head_set = self.evaluate(*heads)?;
                 let head_positions = difference_by(
                     head_set.positions(),
                     EagerRevWalk::new(root_positions.iter().copied().map(Ok)),
@@ -859,14 +876,14 @@ impl EvaluationContext<'_> {
                     Ok(Box::new(RevWalkRevset { walk }))
                 }
             }
-            ResolvedExpression::DagRange {
+            OptimizedRevsetExpression::DagRange {
                 roots,
                 heads,
                 generation_from_roots,
             } => {
-                let root_set = self.evaluate(roots)?;
+                let root_set = self.evaluate(*roots)?;
                 let root_positions = root_set.positions().attach(index);
-                let head_set = self.evaluate(heads)?;
+                let head_set = self.evaluate(*heads)?;
                 let head_positions = head_set.positions().attach(index);
                 let builder =
                     RevWalkBuilder::new(index).wanted_heads(head_positions.try_collect()?);
@@ -911,11 +928,11 @@ impl EvaluationContext<'_> {
                     Ok(Box::new(EagerRevset { positions }))
                 }
             }
-            ResolvedExpression::Reachable { sources, domain } => {
+            OptimizedRevsetExpression::Reachable { sources, domain } => {
                 let mut sets = union_find::UnionFind::<GlobalCommitPosition>::new();
 
                 // Compute all reachable subgraphs.
-                let domain_revset = self.evaluate(domain)?;
+                let domain_revset = self.evaluate(*domain)?;
                 let domain_vec: Vec<_> = domain_revset.positions().attach(index).try_collect()?;
                 let domain_set: HashSet<_> = domain_vec.iter().copied().collect();
                 for pos in &domain_set {
@@ -933,7 +950,7 @@ impl EvaluationContext<'_> {
                 // significantly faster for cases like `reachable(filter, X)`, since the filter
                 // can be checked for only commits in `X` instead of for all visible commits,
                 // and the difference is usually negligible for non-filter revsets.
-                let sources_revset = self.evaluate(sources)?;
+                let sources_revset = self.evaluate(*sources)?;
                 let mut sources_predicate = sources_revset.to_predicate_fn();
                 let mut set_reps = HashSet::new();
                 for (&pos, &rep) in domain_vec.iter().zip(&domain_reps) {
@@ -953,25 +970,25 @@ impl EvaluationContext<'_> {
                     .collect_vec();
                 Ok(Box::new(EagerRevset { positions }))
             }
-            ResolvedExpression::Heads(candidates) => {
-                let candidate_set = self.evaluate(candidates)?;
+            OptimizedRevsetExpression::Heads(candidates) => {
+                let candidate_set = self.evaluate(*candidates)?;
                 let positions = index
                     .commits()
                     .heads_pos(candidate_set.positions().attach(index).try_collect()?);
                 Ok(Box::new(EagerRevset { positions }))
             }
-            ResolvedExpression::HeadsRange {
+            OptimizedRevsetExpression::HeadsRange {
                 roots,
                 heads,
                 parents_range,
                 filter,
             } => {
-                let root_set = self.evaluate(roots)?;
+                let root_set = self.evaluate(*roots)?;
                 let root_positions: Vec<_> = root_set.positions().attach(index).try_collect()?;
                 // Pre-filter heads so queries like 'immutable_heads()..' can
                 // terminate early. immutable_heads() usually includes some
                 // visible heads, which can be trivially rejected.
-                let head_set = self.evaluate(heads)?;
+                let head_set = self.evaluate(*heads)?;
                 let head_positions = difference_by(
                     head_set.positions(),
                     EagerRevWalk::new(root_positions.iter().copied().map(Ok)),
@@ -998,9 +1015,9 @@ impl EvaluationContext<'_> {
                 };
                 Ok(Box::new(EagerRevset { positions }))
             }
-            ResolvedExpression::Roots(candidates) => {
+            OptimizedRevsetExpression::Roots(candidates) => {
                 let mut positions: Vec<_> = self
-                    .evaluate(candidates)?
+                    .evaluate(*candidates)?
                     .positions()
                     .attach(index)
                     .try_collect()?;
@@ -1018,8 +1035,8 @@ impl EvaluationContext<'_> {
                 });
                 Ok(Box::new(EagerRevset { positions }))
             }
-            ResolvedExpression::ForkPoint(expression) => {
-                let expression_set = self.evaluate(expression)?;
+            OptimizedRevsetExpression::ForkPoint(expression) => {
+                let expression_set = self.evaluate(*expression)?;
                 let mut expression_positions_iter = expression_set.positions().attach(index);
                 let Some(position) = expression_positions_iter.next() else {
                     return Ok(Box::new(EagerRevset::empty()));
@@ -1032,8 +1049,8 @@ impl EvaluationContext<'_> {
                 }
                 Ok(Box::new(EagerRevset { positions }))
             }
-            ResolvedExpression::Bisect(candidates) => {
-                let set = self.evaluate(candidates)?;
+            OptimizedRevsetExpression::Bisect(candidates) => {
+                let set = self.evaluate(*candidates)?;
                 // TODO: Make this more correct in non-linear history
                 let candidate_positions: Vec<_> = set.positions().attach(index).try_collect()?;
                 let positions = if candidate_positions.is_empty() {
@@ -1043,38 +1060,38 @@ impl EvaluationContext<'_> {
                 };
                 Ok(Box::new(EagerRevset { positions }))
             }
-            ResolvedExpression::Latest { candidates, count } => {
-                let candidate_set = self.evaluate(candidates)?;
+            OptimizedRevsetExpression::Latest { candidates, count } => {
+                let candidate_set = self.evaluate(*candidates)?;
                 Ok(Box::new(self.take_latest_revset(&*candidate_set, *count)?))
             }
-            ResolvedExpression::Coalesce(expression1, expression2) => {
-                let set1 = self.evaluate(expression1)?;
+            OptimizedRevsetExpression::Coalesce(expression1, expression2) => {
+                let set1 = self.evaluate(*expression1)?;
                 if set1.positions().attach(index).next().is_some() {
                     Ok(set1)
                 } else {
-                    self.evaluate(expression2)
+                    self.evaluate(*expression2)
                 }
             }
-            ResolvedExpression::Union(expression1, expression2) => {
-                let set1 = self.evaluate(expression1)?;
-                let set2 = self.evaluate(expression2)?;
+            OptimizedRevsetExpression::Union(expression1, expression2) => {
+                let set1 = self.evaluate(*expression1)?;
+                let set2 = self.evaluate(*expression2)?;
                 Ok(Box::new(UnionRevset { set1, set2 }))
             }
-            ResolvedExpression::FilterWithin {
+            OptimizedRevsetExpression::FilterWithin {
                 candidates,
                 predicate,
             } => Ok(Box::new(FilterRevset {
-                candidates: self.evaluate(candidates)?,
+                candidates: self.evaluate(*candidates)?,
                 predicate: self.evaluate_predicate(predicate)?,
             })),
-            ResolvedExpression::Intersection(expression1, expression2) => {
-                let set1 = self.evaluate(expression1)?;
-                let set2 = self.evaluate(expression2)?;
+            OptimizedRevsetExpression::Intersection(expression1, expression2) => {
+                let set1 = self.evaluate(*expression1)?;
+                let set2 = self.evaluate(*expression2)?;
                 Ok(Box::new(IntersectionRevset { set1, set2 }))
             }
-            ResolvedExpression::Difference(expression1, expression2) => {
-                let set1 = self.evaluate(expression1)?;
-                let set2 = self.evaluate(expression2)?;
+            OptimizedRevsetExpression::Difference(expression1, expression2) => {
+                let set1 = self.evaluate(*expression1)?;
+                let set2 = self.evaluate(*expression2)?;
                 Ok(Box::new(DifferenceRevset { set1, set2 }))
             }
         }
@@ -1082,25 +1099,25 @@ impl EvaluationContext<'_> {
 
     fn evaluate_predicate(
         &self,
-        expression: &ResolvedPredicateExpression,
+        expression: &OptimizedPredicateExpression,
     ) -> Result<Box<dyn ToPredicateFn>, RevsetEvaluationError> {
         match expression {
-            ResolvedPredicateExpression::Filter(predicate) => {
-                Ok(build_predicate_fn(self.store.clone(), predicate))
+            OptimizedPredicateExpression::Filter(predicate) => {
+                Ok(build_predicate_fn(self.store.clone(), predicate.filter))
             }
-            ResolvedPredicateExpression::Set(expression) => {
-                Ok(self.evaluate(expression)?.into_predicate())
+            OptimizedPredicateExpression::Set(expression) => {
+                Ok(self.evaluate(*expression)?.into_predicate())
             }
-            ResolvedPredicateExpression::NotIn(complement) => {
+            OptimizedPredicateExpression::NotIn(complement) => {
                 let set = self.evaluate_predicate(complement)?;
                 Ok(Box::new(NotInPredicate(set)))
             }
-            ResolvedPredicateExpression::Union(expression1, expression2) => {
+            OptimizedPredicateExpression::Union(expression1, expression2) => {
                 let set1 = self.evaluate_predicate(expression1)?;
                 let set2 = self.evaluate_predicate(expression2)?;
                 Ok(Box::new(UnionRevset { set1, set2 }))
             }
-            ResolvedPredicateExpression::Intersection(expression1, expression2) => {
+            OptimizedPredicateExpression::Intersection(expression1, expression2) => {
                 let set1 = self.evaluate_predicate(expression1)?;
                 let set2 = self.evaluate_predicate(expression2)?;
                 Ok(Box::new(IntersectionRevset { set1, set2 }))

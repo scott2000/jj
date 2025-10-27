@@ -1633,22 +1633,22 @@ mod tests {
                             SectionChangedLine {
                                 is_checked: false,
                                 change_type: Removed,
-                                line: "%%%%%%% Changes from base to side #1\n",
+                                line: "+++++++ Contents of side #1\n",
                             },
                             SectionChangedLine {
                                 is_checked: false,
                                 change_type: Removed,
-                                line: "+1\n",
+                                line: "1\n",
                             },
                             SectionChangedLine {
                                 is_checked: false,
                                 change_type: Removed,
-                                line: "+++++++ Contents of side #2\n",
+                                line: "%%%%%%% Changes from base to side #2\n",
                             },
                             SectionChangedLine {
                                 is_checked: false,
                                 change_type: Removed,
-                                line: "2\n",
+                                line: "+2\n",
                             },
                             SectionChangedLine {
                                 is_checked: false,

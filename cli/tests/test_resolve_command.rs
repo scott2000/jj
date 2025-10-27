@@ -54,11 +54,11 @@ fn test_resolution() {
     ");
     insta::assert_snapshot!(work_dir.read_file("file"), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    a
+    %%%%%%% Changes from base to side #2
     -base
-    +a
-    +++++++ Contents of side #2
-    b
+    +b
     >>>>>>> Conflict 1 of 1 ends
     ");
     let setup_opid = work_dir.current_operation_id();
@@ -88,11 +88,11 @@ fn test_resolution() {
     +++ b/file
     @@ -1,7 +1,1 @@
     -<<<<<<< Conflict 1 of 1
-    -%%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+    -a
+    -%%%%%%% Changes from base to side #2
     --base
-    -+a
-    -+++++++ Contents of side #2
-    -b
+    -+b
     ->>>>>>> Conflict 1 of 1 ends
     +resolution
     [EOF]
@@ -128,11 +128,11 @@ fn test_resolution() {
     +++ b/file
     @@ -1,7 +1,1 @@
     -<<<<<<< Conflict 1 of 1
-    -%%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+    -a
+    -%%%%%%% Changes from base to side #2
     --base
-    -+a
-    -+++++++ Contents of side #2
-    -b
+    -+b
     ->>>>>>> Conflict 1 of 1 ends
     +resolution
     [EOF]
@@ -162,11 +162,11 @@ fn test_resolution() {
     insta::assert_snapshot!(
         std::fs::read_to_string(test_env.env_root().join("editor1")).unwrap(), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    a
+    %%%%%%% Changes from base to side #2
     -base
-    +a
-    +++++++ Contents of side #2
-    b
+    +b
     >>>>>>> Conflict 1 of 1 ends
     ");
     insta::assert_snapshot!(work_dir.run_jj(["diff", "--git"]), @r"
@@ -176,11 +176,11 @@ fn test_resolution() {
     +++ b/file
     @@ -1,7 +1,1 @@
     -<<<<<<< Conflict 1 of 1
-    -%%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+    -a
+    -%%%%%%% Changes from base to side #2
     --base
-    -+a
-    -+++++++ Contents of side #2
-    -b
+    -+b
     ->>>>>>> Conflict 1 of 1 ends
     +resolution
     [EOF]
@@ -234,11 +234,11 @@ fn test_resolution() {
     insta::assert_snapshot!(
         std::fs::read_to_string(test_env.env_root().join("editor2")).unwrap(), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    a
+    %%%%%%% Changes from base to side #2
     -base
-    +a
-    +++++++ Contents of side #2
-    b
+    +b
     >>>>>>> Conflict 1 of 1 ends
     ");
     // Note the "Modified" below
@@ -248,13 +248,15 @@ fn test_resolution() {
     +++ b/file
     @@ -1,7 +1,7 @@
      <<<<<<< Conflict 1 of 1
-     %%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+    -a
+    -%%%%%%% Changes from base to side #2
     --base
-    -+a
+    -+b
+    +%%%%%%% Changes from base to side #1
     +-some
     ++fake
-     +++++++ Contents of side #2
-    -b
+    ++++++++ Contents of side #2
     +conflict
      >>>>>>> Conflict 1 of 1 ends
     [EOF]
@@ -307,11 +309,11 @@ fn test_resolution() {
     +++ b/file
     @@ -1,7 +1,7 @@
     -<<<<<<< Conflict 1 of 1
-    -%%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+    -a
+    -%%%%%%% Changes from base to side #2
     --base
-    -+a
-    -+++++++ Contents of side #2
-    -b
+    -+b
     ->>>>>>> Conflict 1 of 1 ends
     +<<<<<<<
     +%%%%%%%
@@ -391,13 +393,15 @@ fn test_resolution() {
     +++ b/file
     @@ -1,7 +1,7 @@
      <<<<<<< Conflict 1 of 1
-     %%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+    -a
+    -%%%%%%% Changes from base to side #2
     --base
-    -+a
+    -+b
+    +%%%%%%% Changes from base to side #1
     +-fake
     ++some
-     +++++++ Contents of side #2
-    -b
+    ++++++++ Contents of side #2
     +conflict
      >>>>>>> Conflict 1 of 1 ends
     [EOF]
@@ -462,13 +466,15 @@ fn test_resolution() {
     +++ b/file
     @@ -1,7 +1,7 @@
      <<<<<<< Conflict 1 of 1
-     %%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+    -a
+    -%%%%%%% Changes from base to side #2
     --base
-    -+a
+    -+b
+    +%%%%%%% Changes from base to side #1
     +-fake
     ++some
-     +++++++ Contents of side #2
-    -b
+    ++++++++ Contents of side #2
     +conflict
      >>>>>>> Conflict 1 of 1 ends
     [EOF]
@@ -570,11 +576,11 @@ fn test_normal_conflict_input_files() {
     ");
     insta::assert_snapshot!(work_dir.read_file("file"), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    a
+    %%%%%%% Changes from base to side #2
     -base
-    +a
-    +++++++ Contents of side #2
-    b
+    +b
     >>>>>>> Conflict 1 of 1 ends
     ");
 
@@ -610,10 +616,10 @@ fn test_baseless_conflict_input_files() {
     ");
     insta::assert_snapshot!(work_dir.read_file("file"), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
-    +a
-    +++++++ Contents of side #2
-    b
+    +++++++ Contents of side #1
+    a
+    %%%%%%% Changes from base to side #2
+    +b
     >>>>>>> Conflict 1 of 1 ends
     ");
 
@@ -692,20 +698,20 @@ fn test_simplify_conflict_sides() {
     ");
     insta::assert_snapshot!(work_dir.read_file("fileA"), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    1
+    %%%%%%% Changes from base to side #2
     -base
-    +1
-    +++++++ Contents of side #2
-    2
+    +2
     >>>>>>> Conflict 1 of 1 ends
     ");
     insta::assert_snapshot!(work_dir.read_file("fileB"), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    1
+    %%%%%%% Changes from base to side #2
     -base
-    +1
-    +++++++ Contents of side #2
-    2
+    +2
     >>>>>>> Conflict 1 of 1 ends
     ");
 
@@ -762,11 +768,11 @@ fn test_simplify_conflict_sides() {
     "###);
     insta::assert_snapshot!(work_dir.read_file("fileB"), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    1_edited
+    %%%%%%% Changes from base to side #2
     -base_edited
-    +1_edited
-    +++++++ Contents of side #2
-    2_edited
+    +2_edited
     >>>>>>> Conflict 1 of 1 ends
     ");
     insta::assert_snapshot!(work_dir.run_jj(["resolve", "--list"]), @r"
@@ -951,21 +957,21 @@ fn test_resolve_conflicts_with_executable() {
     ");
     insta::assert_snapshot!(work_dir.read_file("file1"), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    a1
+    %%%%%%% Changes from base to side #2
     -base1
-    +a1
-    +++++++ Contents of side #2
-    b1
+    +b1
     >>>>>>> Conflict 1 of 1 ends
     "
     );
     insta::assert_snapshot!(work_dir.read_file("file2"), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    a2
+    %%%%%%% Changes from base to side #2
     -base2
-    +a2
-    +++++++ Contents of side #2
-    b2
+    +b2
     >>>>>>> Conflict 1 of 1 ends
     "
     );
@@ -1000,11 +1006,11 @@ fn test_resolve_conflicts_with_executable() {
     +++ b/file1
     @@ -1,7 +1,1 @@
     -<<<<<<< Conflict 1 of 1
-    -%%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+    -a1
+    -%%%%%%% Changes from base to side #2
     --base1
-    -+a1
-    -+++++++ Contents of side #2
-    -b1
+    -+b1
     ->>>>>>> Conflict 1 of 1 ends
     +resolution1
     [EOF]
@@ -1044,11 +1050,11 @@ fn test_resolve_conflicts_with_executable() {
     +++ b/file2
     @@ -1,7 +1,1 @@
     -<<<<<<< Conflict 1 of 1
-    -%%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+    -a2
+    -%%%%%%% Changes from base to side #2
     --base2
-    -+a2
-    -+++++++ Contents of side #2
-    -b2
+    -+b2
     ->>>>>>> Conflict 1 of 1 ends
     +resolution2
     [EOF]
@@ -1076,26 +1082,24 @@ fn test_resolve_conflicts_with_executable() {
     +++ b/file1
     @@ -1,7 +1,1 @@
     -<<<<<<< Conflict 1 of 1
-    -%%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+     a1
+    -%%%%%%% Changes from base to side #2
     --base1
-    -+a1
-    -+++++++ Contents of side #2
-    -b1
+    -+b1
     ->>>>>>> Conflict 1 of 1 ends
-    +a1
     diff --git a/file2 b/file2
     index 0000000000..c1827f07e1 100755
     --- a/file2
     +++ b/file2
     @@ -1,7 +1,1 @@
     -<<<<<<< Conflict 1 of 1
-    -%%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+     a2
+    -%%%%%%% Changes from base to side #2
     --base2
-    -+a2
-    -+++++++ Contents of side #2
-    -b2
+    -+b2
     ->>>>>>> Conflict 1 of 1 ends
-    +a2
     [EOF]
     ");
 
@@ -1117,24 +1121,26 @@ fn test_resolve_conflicts_with_executable() {
     +++ b/file1
     @@ -1,7 +1,1 @@
     -<<<<<<< Conflict 1 of 1
-    -%%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+    -a1
+    -%%%%%%% Changes from base to side #2
     --base1
-    -+a1
-    -+++++++ Contents of side #2
-     b1
+    -+b1
     ->>>>>>> Conflict 1 of 1 ends
+    +b1
     diff --git a/file2 b/file2
     index 0000000000..e6bfff5c1d 100755
     --- a/file2
     +++ b/file2
     @@ -1,7 +1,1 @@
     -<<<<<<< Conflict 1 of 1
-    -%%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+    -a2
+    -%%%%%%% Changes from base to side #2
     --base2
-    -+a2
-    -+++++++ Contents of side #2
-     b2
+    -+b2
     ->>>>>>> Conflict 1 of 1 ends
+    +b2
     [EOF]
     ");
 }
@@ -1740,20 +1746,20 @@ fn test_multiple_conflicts() {
     insta::assert_snapshot!(
         work_dir.read_file("this_file_has_a_very_long_name_to_test_padding"), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    first a
+    %%%%%%% Changes from base to side #2
     -first base
-    +first a
-    +++++++ Contents of side #2
-    first b
+    +first b
     >>>>>>> Conflict 1 of 1 ends
     ");
     insta::assert_snapshot!(work_dir.read_file("another_file"), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    second a
+    %%%%%%% Changes from base to side #2
     -second base
-    +second a
-    +++++++ Contents of side #2
-    second b
+    +second b
     >>>>>>> Conflict 1 of 1 ends
     ");
     let setup_opid = work_dir.current_operation_id();
@@ -1798,11 +1804,11 @@ fn test_multiple_conflicts() {
     +++ b/another_file
     @@ -1,7 +1,1 @@
     -<<<<<<< Conflict 1 of 1
-    -%%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+    -second a
+    -%%%%%%% Changes from base to side #2
     --second base
-    -+second a
-    -+++++++ Contents of side #2
-    -second b
+    -+second b
     ->>>>>>> Conflict 1 of 1 ends
     +resolution another_file
     [EOF]
@@ -1841,11 +1847,11 @@ fn test_multiple_conflicts() {
     +++ b/another_file
     @@ -1,7 +1,1 @@
     -<<<<<<< Conflict 1 of 1
-    -%%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+    -second a
+    -%%%%%%% Changes from base to side #2
     --second base
-    -+second a
-    -+++++++ Contents of side #2
-    -second b
+    -+second b
     ->>>>>>> Conflict 1 of 1 ends
     +first resolution for auto-chosen file
     diff --git a/this_file_has_a_very_long_name_to_test_padding b/this_file_has_a_very_long_name_to_test_padding
@@ -1854,11 +1860,11 @@ fn test_multiple_conflicts() {
     +++ b/this_file_has_a_very_long_name_to_test_padding
     @@ -1,7 +1,1 @@
     -<<<<<<< Conflict 1 of 1
-    -%%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+    -first a
+    -%%%%%%% Changes from base to side #2
     --first base
-    -+first a
-    -+++++++ Contents of side #2
-    -first b
+    -+first b
     ->>>>>>> Conflict 1 of 1 ends
     +second resolution for auto-chosen file
     [EOF]
@@ -1916,21 +1922,21 @@ fn test_multiple_conflicts_with_error() {
     ");
     insta::assert_snapshot!(work_dir.read_file("file1"), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    a1
+    %%%%%%% Changes from base to side #2
     -base1
-    +a1
-    +++++++ Contents of side #2
-    b1
+    +b1
     >>>>>>> Conflict 1 of 1 ends
     "
     );
     insta::assert_snapshot!(work_dir.read_file("file2"), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    a2
+    %%%%%%% Changes from base to side #2
     -base2
-    +a2
-    +++++++ Contents of side #2
-    b2
+    +b2
     >>>>>>> Conflict 1 of 1 ends
     "
     );
@@ -1973,11 +1979,11 @@ fn test_multiple_conflicts_with_error() {
     +++ b/file1
     @@ -1,7 +1,1 @@
     -<<<<<<< Conflict 1 of 1
-    -%%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+    -a1
+    -%%%%%%% Changes from base to side #2
     --base1
-    -+a1
-    -+++++++ Contents of side #2
-    -b1
+    -+b1
     ->>>>>>> Conflict 1 of 1 ends
     +resolution1
     [EOF]
@@ -2025,11 +2031,11 @@ fn test_multiple_conflicts_with_error() {
     +++ b/file1
     @@ -1,7 +1,1 @@
     -<<<<<<< Conflict 1 of 1
-    -%%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+    -a1
+    -%%%%%%% Changes from base to side #2
     --base1
-    -+a1
-    -+++++++ Contents of side #2
-    -b1
+    -+b1
     ->>>>>>> Conflict 1 of 1 ends
     +resolution1
     [EOF]
@@ -2110,20 +2116,20 @@ fn test_resolve_with_contents_of_side() {
     ");
     insta::assert_snapshot!(work_dir.read_file("file"), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    a
+    %%%%%%% Changes from base to side #2
     -base
-    +a
-    +++++++ Contents of side #2
-    b
+    +b
     >>>>>>> Conflict 1 of 1 ends
     ");
     insta::assert_snapshot!(work_dir.read_file("other"), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    left
+    %%%%%%% Changes from base to side #2
     -base
-    +left
-    +++++++ Contents of side #2
-    right
+    +right
     >>>>>>> Conflict 1 of 1 ends
     ");
     let setup_opid = work_dir.current_operation_id();

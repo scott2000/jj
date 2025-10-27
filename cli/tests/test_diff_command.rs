@@ -2971,13 +2971,13 @@ fn test_diff_conflict_three_sides() {
     diff --git a/file b/file
     --- a/file
     +++ b/file
-    @@ -2,3 +2,3 @@
-     <<<<<<< Conflict 1 of 1
-    -%%%%%%% Changes from base to side #1
-    +%%%%%%% Changes from base #1 to side #1
+    @@ -6,3 +6,3 @@
+     line 4 base
+    -%%%%%%% Changes from base to side #2
+    +%%%%%%% Changes from base #1 to side #2
      -line 2 base
     @@ -12,2 +12,5 @@
-     line 4 b.2
+     +line 4 b.2
     +%%%%%%% Changes from base #2 to side #3
     + line 2 base
     ++line 3 c.2
@@ -2986,12 +2986,12 @@ fn test_diff_conflict_three_sides() {
     ");
     insta::assert_snapshot!(diff_color_words_materialized("side1+side2", "side1+side2+side3"), @r"
     [38;5;3mModified conflict in file:[39m
-    [38;5;1m   1[39m [38;5;2m   1[39m: line 1
-    [38;5;1m   2[39m [38;5;2m   2[39m: <<<<<<< Conflict 1 of 1
-    [38;5;1m   3[39m [38;5;2m   3[39m: %%%%%%% Changes from base [4m[38;5;2m#1 [24m[39mto side #1
-    [38;5;1m   4[39m [38;5;2m   4[39m: -line 2 base
         ...
-    [38;5;1m  12[39m [38;5;2m  12[39m: line 4 b.2
+    [38;5;1m   6[39m [38;5;2m   6[39m: line 4 base
+    [38;5;1m   7[39m [38;5;2m   7[39m: %%%%%%% Changes from base [4m[38;5;2m#1 [24m[39mto side #2
+    [38;5;1m   8[39m [38;5;2m   8[39m: -line 2 base
+        ...
+    [38;5;1m  12[39m [38;5;2m  12[39m: +line 4 b.2
          [38;5;2m  13[39m: [4m[38;5;2m%%%%%%% Changes from base #2 to side #3[24m[39m
          [38;5;2m  14[39m: [4m[38;5;2m line 2 base[24m[39m
          [38;5;2m  15[39m: [4m[38;5;2m+line 3 c.2[24m[39m

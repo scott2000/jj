@@ -182,11 +182,11 @@ fn test_restore_conflicted_merge() {
     ");
     insta::assert_snapshot!(work_dir.read_file("file"), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    a
+    %%%%%%% Changes from base to side #2
     -base
-    +a
-    +++++++ Contents of side #2
-    b
+    +b
     >>>>>>> Conflict 1 of 1 ends
     ");
 
@@ -195,11 +195,11 @@ fn test_restore_conflicted_merge() {
     insta::assert_snapshot!(work_dir.run_jj(["diff"]), @r"
     Resolved conflict in file:
        1     : <<<<<<< Conflict 1 of 1
-       2     : %%%%%%% Changes from base to side #1
-       3     : -base
-       4     : +a
-       5     : +++++++ Contents of side #2
-       6     : b
+       2     : +++++++ Contents of side #1
+       3     : a
+       4     : %%%%%%% Changes from base to side #2
+       5     : -base
+       6     : +b
        7     : >>>>>>> Conflict 1 of 1 ends
             1: resolution
     [EOF]
@@ -219,11 +219,11 @@ fn test_restore_conflicted_merge() {
     ");
     insta::assert_snapshot!(work_dir.read_file("file"), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    a
+    %%%%%%% Changes from base to side #2
     -base
-    +a
-    +++++++ Contents of side #2
-    b
+    +b
     >>>>>>> Conflict 1 of 1 ends
     ");
     let output = work_dir.run_jj(["diff"]);
@@ -234,11 +234,11 @@ fn test_restore_conflicted_merge() {
     insta::assert_snapshot!(work_dir.run_jj(["diff"]), @r"
     Resolved conflict in file:
        1     : <<<<<<< Conflict 1 of 1
-       2     : %%%%%%% Changes from base to side #1
-       3     : -base
-       4     : +a
-       5     : +++++++ Contents of side #2
-       6     : b
+       2     : +++++++ Contents of side #1
+       3     : a
+       4     : %%%%%%% Changes from base to side #2
+       5     : -base
+       6     : +b
        7     : >>>>>>> Conflict 1 of 1 ends
             1: resolution
     [EOF]
@@ -258,11 +258,11 @@ fn test_restore_conflicted_merge() {
     ");
     insta::assert_snapshot!(work_dir.read_file("file"), @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    a
+    %%%%%%% Changes from base to side #2
     -base
-    +a
-    +++++++ Contents of side #2
-    b
+    +b
     >>>>>>> Conflict 1 of 1 ends
     ");
 }

@@ -139,10 +139,10 @@ fn test_annotate_conflicted() {
     insta::assert_snapshot!(output, @r"
     qpvuntsm test.use 2001-02-03 08:05:08    1: line1
     yostqsxw test.use 2001-02-03 08:05:15    2: <<<<<<< Conflict 1 of 1
-    yostqsxw test.use 2001-02-03 08:05:15    3: %%%%%%% Changes from base to side #1
-    yostqsxw test.use 2001-02-03 08:05:15    4: +new text from new commit 1
-    yostqsxw test.use 2001-02-03 08:05:15    5: +++++++ Contents of side #2
-    royxmykx test.use 2001-02-03 08:05:13    6: new text from new commit 2
+    yostqsxw test.use 2001-02-03 08:05:15    3: +++++++ Contents of side #1
+    zsuskuln test.use 2001-02-03 08:05:11    4: new text from new commit 1
+    yostqsxw test.use 2001-02-03 08:05:15    5: %%%%%%% Changes from base to side #2
+    yostqsxw test.use 2001-02-03 08:05:15    6: +new text from new commit 2
     yostqsxw test.use 2001-02-03 08:05:15    7: >>>>>>> Conflict 1 of 1 ends
     [EOF]
     ");

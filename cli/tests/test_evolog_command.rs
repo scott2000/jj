@@ -74,12 +74,11 @@ fn test_evolog_with_or_without_diff() {
     │  -- operation 3499115d3831 snapshot working copy
     │  Resolved conflict in file1:
     │     1     : <<<<<<< Conflict 1 of 1
-    │     2     : %%%%%%% Changes from base to side #1
-    │     3     : -foo
-    │     4     : +++++++ Contents of side #2
-    │     5     : foo
-    │     6     : bar
-    │     7    1: >>>>>>> Conflict 1 of 1 endsresolved
+    │     2     : +++++++ Contents of side #1
+    │     3     : %%%%%%% Changes from base to side #2
+    │     4     :  foo
+    │     5     : +bar
+    │     6    1: >>>>>>> Conflict 1 of 1 endsresolved
     ×  rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 7f56b2a0 conflict
     │  my description
     │  -- operation eb87ec366530 rebase commit 51e08f95160c897080d035d330aead3ee6ed5588
@@ -163,13 +162,12 @@ fn test_evolog_with_or_without_diff() {
     index 0000000000..2ab19ae607 100644
     --- a/file1
     +++ b/file1
-    @@ -1,7 +1,1 @@
+    @@ -1,6 +1,1 @@
     -<<<<<<< Conflict 1 of 1
-    -%%%%%%% Changes from base to side #1
-    --foo
-    -+++++++ Contents of side #2
-    -foo
-    -bar
+    -+++++++ Contents of side #1
+    -%%%%%%% Changes from base to side #2
+    - foo
+    -+bar
     ->>>>>>> Conflict 1 of 1 ends
     +resolved
     rlvkpnrz hidden test.user@example.com 2001-02-03 08:05:09 7f56b2a0 conflict

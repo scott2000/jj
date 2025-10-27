@@ -650,11 +650,11 @@ fn test_diffedit_merge() {
     let output = work_dir.run_jj(["file", "show", "file2"]);
     insta::assert_snapshot!(output, @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    c
+    %%%%%%% Changes from base to side #2
     -a
-    +c
-    +++++++ Contents of side #2
-    b
+    +b
     >>>>>>> Conflict 1 of 1 ends
     [EOF]
     ");

@@ -56,11 +56,11 @@ fn test_chmod_regular_conflict() {
     let output = work_dir.run_jj(["file", "show", "file"]);
     insta::assert_snapshot!(output, @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    x
+    %%%%%%% Changes from base to side #2
     -base
-    +x
-    +++++++ Contents of side #2
-    n
+    +n
     >>>>>>> Conflict 1 of 1 ends
     [EOF]
     ");
@@ -75,11 +75,11 @@ fn test_chmod_regular_conflict() {
     let output = work_dir.run_jj(["file", "show", "file"]);
     insta::assert_snapshot!(output, @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    x
+    %%%%%%% Changes from base to side #2
     -base
-    +x
-    +++++++ Contents of side #2
-    n
+    +n
     >>>>>>> Conflict 1 of 1 ends
     [EOF]
     ");
@@ -92,11 +92,11 @@ fn test_chmod_regular_conflict() {
     let output = work_dir.run_jj(["file", "show", "file"]);
     insta::assert_snapshot!(output, @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    x
+    %%%%%%% Changes from base to side #2
     -base
-    +x
-    +++++++ Contents of side #2
-    n
+    +n
     >>>>>>> Conflict 1 of 1 ends
     [EOF]
     ");

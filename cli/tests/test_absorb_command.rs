@@ -198,33 +198,34 @@ fn test_absorb_replace_single_line_hunk() {
     │  index 0000000000..2f87e8e465 100644
     │  --- a/file1
     │  +++ b/file1
-    │  @@ -1,10 +1,3 @@
+    │  @@ -1,9 +1,3 @@
     │  -<<<<<<< Conflict 1 of 1
-    │  -%%%%%%% Changes from base to side #1
-    │  --2a
-    │  - 1a
-    │  --2b
-    │  -+++++++ Contents of side #2
-    │   2a
-    │   1A
-    │   2b
+    │  -+++++++ Contents of side #1
+    │  -1a
+    │  -%%%%%%% Changes from base to side #2
+    │  - 2a
+    │  --1a
+    │  -+1A
+    │  - 2b
     │  ->>>>>>> Conflict 1 of 1 ends
+    │  +2a
+    │  +1A
+    │  +2b
     ×  qpvuntsm 5bdb5ca1 (conflict) 1
     │  diff --git a/file1 b/file1
     ~  new file mode 100644
        index 0000000000..0000000000
        --- /dev/null
        +++ b/file1
-       @@ -0,0 +1,10 @@
+       @@ -0,0 +1,9 @@
        +<<<<<<< Conflict 1 of 1
-       +%%%%%%% Changes from base to side #1
-       +-2a
-       + 1a
-       +-2b
-       ++++++++ Contents of side #2
-       +2a
-       +1A
-       +2b
+       ++++++++ Contents of side #1
+       +1a
+       +%%%%%%% Changes from base to side #2
+       + 2a
+       +-1a
+       ++1A
+       + 2b
        +>>>>>>> Conflict 1 of 1 ends
     [EOF]
     ");
@@ -443,12 +444,12 @@ fn test_absorb_conflict() {
     let conflict_content = work_dir.read_file("file1");
     insta::assert_snapshot!(conflict_content, @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
-    +1a
-    +1b
-    +++++++ Contents of side #2
-    2a
-    2b
+    +++++++ Contents of side #1
+    1a
+    1b
+    %%%%%%% Changes from base to side #2
+    +2a
+    +2b
     >>>>>>> Conflict 1 of 1 ends
     ");
 
@@ -578,11 +579,11 @@ fn test_absorb_deleted_file_with_multiple_hunks() {
     │  +++ /dev/null
     │  @@ -1,7 +0,0 @@
     │  -<<<<<<< Conflict 1 of 1
-    │  -%%%%%%% Changes from base to side #1
-    │  --1a
-    │  - 1b
-    │  -+++++++ Contents of side #2
-    │  -1a
+    │  -+++++++ Contents of side #1
+    │  -1b
+    │  -%%%%%%% Changes from base to side #2
+    │  - 1a
+    │  --1b
     │  ->>>>>>> Conflict 1 of 1 ends
     ×  kkmpptxz 8407ab95 (conflict) 2
     │  diff --git a/file1 b/file1
@@ -590,26 +591,27 @@ fn test_absorb_deleted_file_with_multiple_hunks() {
     │  index 0000000000..0000000000
     │  --- a/file1
     │  +++ /dev/null
-    │  @@ -1,6 +0,0 @@
+    │  @@ -1,7 +0,0 @@
     │  -<<<<<<< Conflict 1 of 1
-    │  -%%%%%%% Changes from base to side #1
-    │  - 1a
-    │  -+1b
-    │  -+++++++ Contents of side #2
+    │  -+++++++ Contents of side #1
+    │  -1a
+    │  -1b
+    │  -%%%%%%% Changes from base to side #2
+    │  --1a
     │  ->>>>>>> Conflict 1 of 1 ends
     │  diff --git a/file2 b/file2
     │  --- a/file2
     │  +++ b/file2
     │  @@ -1,7 +1,7 @@
     │   <<<<<<< Conflict 1 of 1
-    │   %%%%%%% Changes from base to side #1
-    │  - 1a
-    │  --1b
-    │  +-1a
-    │  + 1b
-    │   +++++++ Contents of side #2
-    │  -1b
-    │  +1a
+    │   +++++++ Contents of side #1
+    │  -1a
+    │  +1b
+    │   %%%%%%% Changes from base to side #2
+    │  --1a
+    │  - 1b
+    │  + 1a
+    │  +-1b
     │   >>>>>>> Conflict 1 of 1 ends
     ×  qpvuntsm f1473264 (conflict) 1
     │  diff --git a/file1 b/file1
@@ -617,12 +619,13 @@ fn test_absorb_deleted_file_with_multiple_hunks() {
        index 0000000000..0000000000
        --- /dev/null
        +++ b/file1
-       @@ -0,0 +1,6 @@
+       @@ -0,0 +1,7 @@
        +<<<<<<< Conflict 1 of 1
-       +%%%%%%% Changes from base to side #1
-       + 1a
-       ++1b
-       ++++++++ Contents of side #2
+       ++++++++ Contents of side #1
+       +1a
+       +1b
+       +%%%%%%% Changes from base to side #2
+       +-1a
        +>>>>>>> Conflict 1 of 1 ends
        diff --git a/file2 b/file2
        new file mode 100644
@@ -631,11 +634,11 @@ fn test_absorb_deleted_file_with_multiple_hunks() {
        +++ b/file2
        @@ -0,0 +1,7 @@
        +<<<<<<< Conflict 1 of 1
-       +%%%%%%% Changes from base to side #1
-       + 1a
-       +-1b
-       ++++++++ Contents of side #2
-       +1b
+       ++++++++ Contents of side #1
+       +1a
+       +%%%%%%% Changes from base to side #2
+       +-1a
+       + 1b
        +>>>>>>> Conflict 1 of 1 ends
     [EOF]
     ");

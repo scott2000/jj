@@ -885,22 +885,22 @@ fn test_materialize_snapshot_conflicted_files() {
         std::fs::read_to_string(file1_path.to_fs_path_unchecked(&workspace_root)).ok().unwrap(),
         @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    a
+    %%%%%%% Changes from base to side #2
     -b
-    +a
-    +++++++ Contents of side #2
-    c
+    +c
     >>>>>>> Conflict 1 of 1 ends
     ");
     insta::assert_snapshot!(
         std::fs::read_to_string(file2_path.to_fs_path_unchecked(&workspace_root)).ok().unwrap(),
         @r"
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    1
+    %%%%%%% Changes from base to side #2
     -2
-    +1
-    +++++++ Contents of side #2
-    4
+    +4
     >>>>>>> Conflict 1 of 1 ends
     ");
 

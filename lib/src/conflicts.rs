@@ -618,12 +618,14 @@ fn materialize_jj_style_conflict(
 
         let diff1 = ContentDiff::by_line([&left, &right1]).hunks().collect_vec();
         // If we haven't written a snapshot yet, then we need to decide whether to
-        // format the current side as a snapshot or a diff. We write the current side as
-        // a diff unless the next side has a smaller diff compared to the current base.
+        // format the current side as a snapshot or a diff. We prefer to emit a snapshot
+        // as early as possible, since that best matches the mental model of conflicts
+        // as a snapshot followed by a series of diffs. But if emitting a snapshot would
+        // create a more than 10% larger diff, then we emit this side as a diff anyway.
         if !snapshot_written {
             let right2 = hunk.get_add(add_index + 1).unwrap();
             let diff2 = ContentDiff::by_line([&left, &right2]).hunks().collect_vec();
-            if diff_size(&diff2) < diff_size(&diff1) {
+            if diff_size(&diff2).saturating_mul(10) <= diff_size(&diff1).saturating_mul(11) {
                 // If the next positive term is a better match, emit the current positive term
                 // as a snapshot and the next positive term as a diff.
                 write_side(add_index, right1, output)?;

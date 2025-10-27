@@ -165,11 +165,11 @@ fn test_interdiff_conflicting() {
     +++ b/file
     @@ -1,7 +1,1 @@
     -<<<<<<< Conflict 1 of 1
-    -%%%%%%% Changes from base to side #1
+    -+++++++ Contents of side #1
+    -abc
+    -%%%%%%% Changes from base to side #2
     --foo
-    -+abc
-    -+++++++ Contents of side #2
-    -bar
+    -+bar
     ->>>>>>> Conflict 1 of 1 ends
     +def
     [EOF]

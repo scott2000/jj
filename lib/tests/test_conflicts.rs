@@ -244,16 +244,16 @@ fn test_materialize_conflict_three_sides() {
         @r"
     line 1
     <<<<<<< Conflict 1 of 1
-    %%%%%%% Changes from base #1 to side #1
+    +++++++ Contents of side #1
+    line 2 a.1
+    line 3 a.2
+    line 4 base
+    %%%%%%% Changes from base #1 to side #2
     -line 2 base
-    -line 3 base
-    +line 2 a.1
-    +line 3 a.2
-     line 4 base
-    +++++++ Contents of side #2
-    line 2 b.1
-    line 3 base
-    line 4 b.2
+    +line 2 b.1
+     line 3 base
+    -line 4 base
+    +line 4 b.2
     %%%%%%% Changes from base #2 to side #3
      line 2 base
     +line 3 c.2
@@ -1758,19 +1758,19 @@ fn test_update_conflict_from_content_simplified_conflict() {
         materialized,
         @r"
     <<<<<<< Conflict 1 of 2
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    left 1
+    %%%%%%% Changes from base to side #2
     -line 1
-    +left 1
-    +++++++ Contents of side #2
-    right 1
+    +right 1
     >>>>>>> Conflict 1 of 2 ends
     line 2
     <<<<<<< Conflict 2 of 2
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    left 3
+    %%%%%%% Changes from base to side #2
     -line 3
-    +left 3
-    +++++++ Contents of side #2
-    right 3
+    +right 3
     >>>>>>> Conflict 2 of 2 ends
     "
     );
@@ -2003,11 +2003,11 @@ fn test_update_conflict_from_content_no_eol() {
         @r"
     line 1
     <<<<<<< Conflict 1 of 2
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    line 2 left
+    %%%%%%% Changes from base to side #2
     -line 2
-    +line 2 left
-    +++++++ Contents of side #2
-    line 2 right
+    +line 2 right
     >>>>>>> Conflict 1 of 2 ends
     line 3
     <<<<<<< Conflict 2 of 2
@@ -2280,19 +2280,19 @@ fn test_update_from_content_malformed_conflict() {
     insta::assert_snapshot!(materialized, @r"
     line 1
     <<<<<<< Conflict 1 of 2
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    line 2 left
+    %%%%%%% Changes from base to side #2
     -line 2
-    +line 2 left
-    +++++++ Contents of side #2
-    line 2 right
+    +line 2 right
     >>>>>>> Conflict 1 of 2 ends
     line 3
     <<<<<<< Conflict 2 of 2
-    %%%%%%% Changes from base to side #1
+    +++++++ Contents of side #1
+    line 4 left
+    %%%%%%% Changes from base to side #2
     -line 4
-    +line 4 left
-    +++++++ Contents of side #2
-    line 4 right
+    +line 4 right
     >>>>>>> Conflict 2 of 2 ends
     line 5
     "

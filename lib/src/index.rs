@@ -18,6 +18,7 @@ use std::any::Any;
 use std::fmt::Debug;
 use std::sync::Arc;
 
+use itertools::Itertools as _;
 use thiserror::Error;
 
 use crate::backend::ChangeId;
@@ -234,6 +235,24 @@ impl ResolvedChangeTargets {
             .iter()
             .filter(|&&(_, state)| state == ResolvedChangeState::Visible);
         visible.next().is_some() && visible.next().is_some()
+    }
+
+    /// Try to resolve this change ID to a single visible commit. If it cannot
+    /// be resolved, returns all visible commits and their change offsets.
+    pub fn try_resolve_to_commit(self) -> Result<CommitId, Vec<(usize, CommitId)>> {
+        let visible_with_offsets = self
+            .targets
+            .into_iter()
+            .enumerate()
+            .filter_map(|(i, (target, state))| {
+                (state == ResolvedChangeState::Visible).then_some((i, target))
+            })
+            .collect_vec();
+        if visible_with_offsets.len() == 1 {
+            Ok(visible_with_offsets.into_iter().next().unwrap().1)
+        } else {
+            Err(visible_with_offsets)
+        }
     }
 
     /// Extracts the visible commits for this change ID. Returns `None` if there

@@ -93,7 +93,7 @@ pub enum RevsetResolutionError {
     #[error("Change ID `{symbol}` is divergent")]
     DivergentChangeId {
         symbol: String,
-        targets: Vec<CommitId>,
+        visible_targets: Vec<(usize, CommitId)>,
     },
     #[error("Name `{symbol}` is conflicted")]
     ConflictedRef {
@@ -2805,13 +2805,13 @@ impl PartialSymbolResolver for ChangePrefixResolver<'_> {
                 })
             }
         } else {
-            match targets.into_visible() {
-                Some(targets) if targets.len() == 1 => Ok(targets.into_iter().next()),
-                Some(targets) => Err(RevsetResolutionError::DivergentChangeId {
+            match targets.try_resolve_to_commit() {
+                Ok(commit_id) => Ok(Some(commit_id)),
+                Err(visible_targets) if visible_targets.is_empty() => Ok(None),
+                Err(visible_targets) => Err(RevsetResolutionError::DivergentChangeId {
                     symbol: change_id.to_owned(),
-                    targets,
+                    visible_targets,
                 }),
-                None => Ok(None),
             }
         }
     }

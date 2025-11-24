@@ -15,6 +15,7 @@
 //! Template environment for `jj log`, `jj evolog` and similar.
 
 use std::any::Any;
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::cmp::max;
 use std::collections::HashMap;
@@ -48,6 +49,7 @@ use jj_lib::fileset::FilesetExpression;
 use jj_lib::id_prefix::IdPrefixContext;
 use jj_lib::id_prefix::IdPrefixIndex;
 use jj_lib::index::IndexResult;
+use jj_lib::index::ResolvedChangeTargets;
 use jj_lib::matchers::Matcher;
 use jj_lib::merge::Diff;
 use jj_lib::merge::MergedTreeValue;
@@ -959,6 +961,7 @@ pub struct CommitKeywordCache<'repo> {
     tags_index: OnceCell<Rc<CommitRefsIndex>>,
     git_refs_index: OnceCell<Rc<CommitRefsIndex>>,
     is_immutable_fn: OnceCell<Rc<RevsetContainingFn<'repo>>>,
+    change_id_cache: Rc<ChangeIdCache>,
 }
 
 impl<'repo> CommitKeywordCache<'repo> {
@@ -1199,9 +1202,10 @@ fn builtin_commit_methods<'repo>() -> CommitTemplateBuildMethodFnMap<'repo, Comm
         |language, _diagnostics, _build_ctx, self_property, function| {
             function.expect_no_arguments()?;
             let repo = language.repo;
-            let out_property = self_property.and_then(|commit| {
+            let change_id_cache = language.keyword_cache.change_id_cache.clone();
+            let out_property = self_property.and_then(move |commit| {
                 // The given commit could be hidden in e.g. `jj evolog`.
-                let maybe_targets = repo.resolve_change_id(commit.change_id())?;
+                let maybe_targets = change_id_cache.resolve_change_id(repo, commit.change_id())?;
                 let divergent = maybe_targets.is_some_and(|targets| targets.is_divergent());
                 Ok(divergent)
             });
@@ -1213,7 +1217,12 @@ fn builtin_commit_methods<'repo>() -> CommitTemplateBuildMethodFnMap<'repo, Comm
         |language, _diagnostics, _build_ctx, self_property, function| {
             function.expect_no_arguments()?;
             let repo = language.repo;
-            let out_property = self_property.and_then(|commit| Ok(commit.is_hidden(repo)?));
+            let change_id_cache = language.keyword_cache.change_id_cache.clone();
+            let out_property = self_property.and_then(move |commit| {
+                let maybe_targets = change_id_cache.resolve_change_id(repo, commit.change_id())?;
+                let hidden = maybe_targets.is_none_or(|targets| !targets.has_visible(commit.id()));
+                Ok(hidden)
+            });
             Ok(out_property.into_dyn_wrapped())
         },
     );
@@ -1222,9 +1231,10 @@ fn builtin_commit_methods<'repo>() -> CommitTemplateBuildMethodFnMap<'repo, Comm
         |language, _diagnostics, _build_ctx, self_property, function| {
             function.expect_no_arguments()?;
             let repo = language.repo;
-            let out_property = self_property.and_then(|commit| {
+            let change_id_cache = language.keyword_cache.change_id_cache.clone();
+            let out_property = self_property.and_then(move |commit| {
                 // The given commit could be hidden in e.g. `jj evolog`.
-                let maybe_targets = repo.resolve_change_id(commit.change_id())?;
+                let maybe_targets = change_id_cache.resolve_change_id(repo, commit.change_id())?;
                 let offset = maybe_targets
                     .and_then(|targets| targets.find_offset(commit.id()))
                     .map(i64::try_from)
@@ -1931,6 +1941,30 @@ fn collect_remote_refs(commit_refs: &[Rc<CommitRef>]) -> Vec<Rc<CommitRef>> {
         .filter(|commit_ref| commit_ref.is_remote())
         .cloned()
         .collect()
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct ChangeIdCache {
+    cache: RefCell<HashMap<ChangeId, Rc<ResolvedChangeTargets>>>,
+}
+
+impl ChangeIdCache {
+    pub fn resolve_change_id(
+        &self,
+        repo: &dyn Repo,
+        change_id: &ChangeId,
+    ) -> IndexResult<Option<Rc<ResolvedChangeTargets>>> {
+        let mut cache = self.cache.borrow_mut();
+        if let Some(resolved) = cache.get(change_id) {
+            return Ok(Some(resolved.clone()));
+        }
+        let Some(resolved) = repo.resolve_change_id(change_id)? else {
+            return Ok(None);
+        };
+        let resolved = Rc::new(resolved);
+        cache.insert(change_id.clone(), resolved.clone());
+        Ok(Some(resolved))
+    }
 }
 
 /// Wrapper to render ref/remote name in revset syntax.

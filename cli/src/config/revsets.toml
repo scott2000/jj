@@ -36,3 +36,5 @@ latest(
 
 'visible()' = '::visible_heads()'
 'hidden()' = '~visible()'
+
+'closest_bookmarks(to)' = 'heads(::to & bookmarks())'

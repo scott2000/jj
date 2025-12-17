@@ -105,6 +105,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   text when outputting to a non-terminal, instead of emitting raw OSC 8 escape
   codes. [#7592](https://github.com/jj-vcs/jj/issues/7592)
 
+* `jj bookmark move` now defaults to `--from 'closest_bookmarks(to)'` when no
+  bookmark name or source revisions are specified. This makes it easy to "tug"
+  a bookmark up to include a new commit by using `jj bookmark move --to @-`.
+
 ### Fixed bugs
 
 * `jj git init --colocate` now refuses to run inside a Git worktree, providing

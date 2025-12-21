@@ -56,6 +56,7 @@ use jj_lib::str_util::StringPatternParseError;
 use jj_lib::trailer::TrailerParseError;
 use jj_lib::transaction::TransactionCommitError;
 use jj_lib::view::RenameWorkspaceError;
+use jj_lib::working_copy::CheckoutError;
 use jj_lib::working_copy::RecoverWorkspaceError;
 use jj_lib::working_copy::ResetError;
 use jj_lib::working_copy::SnapshotError;
@@ -398,6 +399,12 @@ impl From<OpsetEvaluationError> for CommandError {
 impl From<SnapshotError> for CommandError {
     fn from(err: SnapshotError) -> Self {
         internal_error_with_message("Failed to snapshot the working copy", err)
+    }
+}
+
+impl From<CheckoutError> for CommandError {
+    fn from(err: CheckoutError) -> Self {
+        internal_error_with_message("Failed to check out commit in working copy", err)
     }
 }
 

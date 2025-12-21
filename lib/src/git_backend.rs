@@ -66,6 +66,7 @@ use crate::backend::SigningFn;
 use crate::backend::SymlinkId;
 use crate::backend::Timestamp;
 use crate::backend::Tree;
+use crate::backend::TreeEntry;
 use crate::backend::TreeId;
 use crate::backend::TreeValue;
 use crate::backend::make_root_commit;
@@ -953,9 +954,6 @@ fn import_extra_metadata_entries_from_heads(
             .find_object(validate_git_object_id(&id)?)
             .map_err(|err| map_not_found_err(err, &id))?;
         let is_shallow = shallow_roots.contains(&id);
-        // TODO(#1624): Should we read the root tree here and check if it has a
-        // `.jjconflict-...` entries? That could happen if the user used `git` to e.g.
-        // change the description of a commit with tree-level conflicts.
         let commit = commit_from_git_without_root_parent(&id, &git_object, is_shallow)?;
         mut_table.add_entry(id.to_bytes(), serialize_extras(&commit));
         work_ids.extend(
@@ -1538,9 +1536,7 @@ recover.
         .map_err(|err| to_read_object_err(err, first_tree_id))?;
     for entry in first_tree.iter() {
         let entry = entry.map_err(|err| to_read_object_err(err, first_tree_id))?;
-        if !entry.filename().starts_with(b".jjconflict")
-            && entry.filename() != JJ_CONFLICT_README_FILE_NAME
-        {
+        if !is_jj_conflict_file_name(entry.filename()) {
             entries.push(entry.detach().into());
         }
     }
@@ -1552,6 +1548,28 @@ recover.
             source: Box::new(err),
         })?;
     Ok(id.detach())
+}
+
+/// Checks whether a given tree entry is an internal '.jjconflict' file that
+/// shouldn't be added to the working copy.
+fn is_jj_conflict_file_name(name: &[u8]) -> bool {
+    name.starts_with(b".jjconflict") || name == JJ_CONFLICT_README_FILE_NAME.as_bytes()
+}
+
+/// Checks whether a given tree entry is an internal '.jjconflict' file that
+/// shouldn't be added to the working copy.
+pub fn is_jj_conflict_entry(tree_entry: &TreeEntry) -> bool {
+    is_jj_conflict_file_name(tree_entry.name().as_internal_str().as_bytes())
+}
+
+/// Removes any internal '.jjconflict' files from a tree.
+pub fn remove_jj_conflict_files(tree: &Tree) -> Tree {
+    let filtered_entries = tree
+        .entries()
+        .filter(|entry| !is_jj_conflict_entry(entry))
+        .map(|entry| (entry.name().to_owned(), entry.value().clone()))
+        .collect_vec();
+    Tree::from_sorted_entries(filtered_entries)
 }
 
 #[cfg(test)]
@@ -2157,10 +2175,7 @@ mod tests {
         let jj_conflict_entries = git_tree
             .iter()
             .map(Result::unwrap)
-            .filter(|entry| {
-                entry.filename().starts_with(b".jjconflict")
-                    || entry.filename() == JJ_CONFLICT_README_FILE_NAME
-            })
+            .filter(|entry| is_jj_conflict_file_name(entry.filename()))
             .collect_vec();
         assert!(
             jj_conflict_entries

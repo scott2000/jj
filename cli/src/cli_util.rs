@@ -1920,7 +1920,7 @@ to the current parents may contain changes from multiple commits.
         };
 
         self.user_repo = ReadonlyUserRepo::new(repo);
-        let (new_tree, stats) = {
+        let (new_tree_from_wc, stats) = {
             let mut options = options;
             let progress = crate::progress::snapshot_progress(ui);
             options.progress = progress.as_ref().map(|x| x as _);
@@ -1930,6 +1930,16 @@ to the current parents may contain changes from multiple commits.
                 .block_on()
                 .map_err(snapshot_command_error)?
         };
+        // If the user checked out a conflict using `git` commands, they might end up
+        // with the internal conflict representation in their working copy. This can be
+        // difficult to recover from, so we try to automatically fix it for the user.
+        let fixed_tree = fix_git_checkout_jj_conflict_files(
+            ui,
+            self.user_repo.repo.as_ref(),
+            &new_tree_from_wc,
+            &wc_commit,
+        )?;
+        let new_tree = fixed_tree.as_ref().unwrap_or(&new_tree_from_wc);
         if new_tree.tree_ids_and_labels() != wc_commit.tree().tree_ids_and_labels() {
             let mut tx =
                 start_repo_transaction(&self.user_repo.repo, self.env.command.string_args());
@@ -1937,7 +1947,7 @@ to the current parents may contain changes from multiple commits.
             let mut_repo = tx.repo_mut();
             let commit = mut_repo
                 .rewrite_commit(&wc_commit)
-                .set_tree(new_tree)
+                .set_tree(new_tree.clone())
                 .write()
                 .map_err(snapshot_command_error)?;
             mut_repo
@@ -1968,7 +1978,19 @@ to the current parents may contain changes from multiple commits.
                 .commit("snapshot working copy")
                 .map_err(snapshot_command_error)?;
             self.user_repo = ReadonlyUserRepo::new(repo);
+
+            // If we fixed the Git conflict representation, we also have to update the index
+            // to point to the new tree.
+            #[cfg(feature = "git")]
+            if fixed_tree.is_some() {
+                locked_ws
+                    .locked_wc()
+                    .check_out(&commit)
+                    .block_on()
+                    .map_err(snapshot_command_error)?;
+            }
         }
+
         locked_ws
             .finish(self.user_repo.repo.op_id().clone())
             .map_err(snapshot_command_error)?;
@@ -2383,6 +2405,83 @@ pub fn export_working_copy_changes_to_git(
     _new_tree: &MergedTree,
 ) -> Result<(), CommandError> {
     Ok(())
+}
+
+#[cfg(feature = "git")]
+fn fix_git_checkout_jj_conflict_files(
+    ui: &Ui,
+    repo: &dyn Repo,
+    new_tree: &MergedTree,
+    wc_commit: &Commit,
+) -> Result<Option<MergedTree>, SnapshotWorkingCopyError> {
+    use jj_lib::git_backend::remove_jj_conflict_files;
+    use jj_lib::merge::Merge;
+
+    let Ok(resolved_tree) = new_tree
+        .trees()
+        .map_err(snapshot_command_error)?
+        .into_resolved()
+    else {
+        return Ok(None);
+    };
+
+    if !resolved_tree
+        .entries_non_recursive()
+        .any(|entry| jj_lib::git_backend::is_jj_conflict_entry(&entry))
+    {
+        return Ok(None);
+    }
+
+    let parent_tree = wc_commit
+        .parent_tree(repo)
+        .map_err(snapshot_command_error)?;
+    if parent_tree.tree_ids().is_resolved() {
+        return Ok(None);
+    }
+
+    let store = parent_tree.store();
+    let base_tree = MergedTree::resolved(store.clone(), parent_tree.tree_ids().first().clone());
+
+    let new_tree_without_jj_conflict = store
+        .write_tree(
+            RepoPath::root(),
+            remove_jj_conflict_files(resolved_tree.data()),
+        )
+        .block_on()
+        .map_err(snapshot_command_error)?;
+    let new_tree_without_jj_conflict =
+        MergedTree::resolved(store.clone(), new_tree_without_jj_conflict.id().clone());
+    let new_tree = MergedTree::merge(Merge::from_vec(vec![
+        (
+            new_tree_without_jj_conflict,
+            "snapshotted files after git checkout".into(),
+        ),
+        (base_tree, "base tree of git checkout".into()),
+        // This tree is conflicted so it doesn't matter what label we give it.
+        (parent_tree, "".into()),
+    ]))
+    .block_on()
+    .map_err(snapshot_command_error)?;
+    writeln!(
+        ui.warning_default(),
+        "Cleaning up '.jjconflict' files in the working copy."
+    )
+    .map_err(snapshot_command_error)?;
+    writeln!(
+        ui.hint_default(),
+        "You may have used a regular `git` command to check out a conflicted commit."
+    )
+    .map_err(snapshot_command_error)?;
+    Ok(Some(new_tree))
+}
+#[cfg(not(feature = "git"))]
+fn fix_git_checkout_jj_conflict_files(
+    _ui: &Ui,
+    _repo: &dyn Repo,
+    _new_tree: &MergedTree,
+    _wc_commit: &Commit,
+) -> Result<Option<MergedTree>, SnapshotWorkingCopyError> {
+    Ok(None)
 }
 
 /// An ongoing [`Transaction`] tied to a particular workspace.

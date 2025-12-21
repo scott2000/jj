@@ -538,3 +538,75 @@ fn test_submodule_ignored() {
     let output = work_dir.run_jj(["diff", "--summary"]);
     insta::assert_snapshot!(output, @"");
 }
+
+#[test]
+fn test_snapshot_jjconflict_trees() {
+    let test_env = TestEnvironment::default();
+    test_env
+        .run_jj_in(".", ["git", "init", "repo", "--colocate"])
+        .success();
+    let work_dir = test_env.work_dir("repo");
+
+    // Create a conflict in the working copy
+    work_dir.write_file(
+        "file",
+        indoc! {"
+            line 1
+            line 2
+            line 3
+        "},
+    );
+    work_dir.run_jj(["new", "-m", "side-a"]).success();
+    work_dir.write_file(
+        "file",
+        indoc! {"
+            line 1
+            line 2 - left
+            line 3 - left
+        "},
+    );
+    work_dir
+        .run_jj(["new", "subject(side-a)-", "-m", "side-b"])
+        .success();
+    work_dir.write_file(
+        "file",
+        indoc! {"
+            line 1
+            line 2 - right
+            line 3
+        "},
+    );
+    work_dir.run_jj(["new"]).success();
+    work_dir
+        .run_jj(["rebase", "-s", "subject(side-b)", "-o", "subject(side-a)"])
+        .success();
+
+    // Run `git reset --hard HEAD` to simulate checking out the branch with Git.
+    let output = std::process::Command::new("git")
+        .current_dir(work_dir.root())
+        .args(["reset", "--hard", "HEAD"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+
+    // We should see a warning regarding '.jjconflict' trees being checked out.
+    let output = work_dir.run_jj(["st"]);
+    insta::assert_snapshot!(output.to_string().replace('\\', "/"), @r"
+    The working copy has no changes.
+    Working copy  (@) : zsuskuln 197c8f2a (conflict) (empty) (no description set)
+    Parent commit (@-): kkmpptxz e4292adb (conflict) side-b
+    Warning: There are unresolved conflicts at these paths:
+    file    2-sided conflict
+    Hint: To resolve the conflicts, start by creating a commit on top of
+    the conflicted commit:
+      jj new kkmpptxz
+    Then use `jj resolve`, or edit the conflict markers in the file directly.
+    Once the conflicts are resolved, you can inspect the result with `jj diff`.
+    Then run `jj squash` to move the resolution into the conflicted commit.
+    [EOF]
+    ------- stderr -------
+    Warning: Cleaning up '.jjconflict' files in the working copy.
+    Hint: You may have used a regular `git` command to check out a conflicted commit.
+    [EOF]
+    ");
+}
